@@ -1,0 +1,22 @@
+repositories {
+    mavenCentral()
+    google() // Needed for androidx
+}
+
+dependencies {
+    ext.ftc_version = '11.0.0'
+
+    implementation "org.firstinspires.ftc:Inspection:$ftc_version"
+    implementation "org.firstinspires.ftc:Blocks:$ftc_version"
+    //noinspection Aligned16KB
+    implementation "org.firstinspires.ftc:RobotCore:$ftc_version"
+    implementation "org.firstinspires.ftc:RobotServer:$ftc_version"
+    implementation "org.firstinspires.ftc:OnBotJava:$ftc_version"
+    implementation "org.firstinspires.ftc:Hardware:$ftc_version"
+    implementation "org.firstinspires.ftc:FtcCommon:$ftc_version"
+    implementation "org.firstinspires.ftc:Vision:$ftc_version"
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+
+    implementation "io.github.bionictigers.axiom:core:0.1.1"
+}
+
