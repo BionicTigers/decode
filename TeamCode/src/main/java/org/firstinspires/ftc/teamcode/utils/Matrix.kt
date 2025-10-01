@@ -1,15 +1,15 @@
 package org.firstinspires.ftc.teamcode.utils
 
-class Matrix<T: Number>(val value: Array<Array<T>>) {
+class Matrix(val value: Array<Array<Double>>) {
     operator fun get(i: Int, j: Int): Double {
-        return value[i][j] as Double
+        return value[i][j]
     }
 
-    operator fun set(i: Int, j: Int, number: T) {
-        value[i][j] = number
+    operator fun set(i: Int, j: Int, number: Number) {
+        value[i][j] = number as Double
     }
 
-    operator fun plus(other: Matrix<T>): Matrix<Double> {
+    operator fun plus(other: Matrix): Matrix {
         if (this.value.size != other.value.size || this.value[0].size != other.value[0].size) {
             throw IllegalArgumentException("Matrices must have the same dimensions to be added")
         }
@@ -25,7 +25,7 @@ class Matrix<T: Number>(val value: Array<Array<T>>) {
         return Matrix(result)
     }
 
-    operator fun minus(other: Matrix<T>): Matrix<Double> {
+    operator fun minus(other: Matrix): Matrix {
         if (this.value.size != other.value.size || this.value[0].size != other.value[0].size) {
             throw IllegalArgumentException("Matrices must have the same dimensions to be subtracted")
         }
@@ -41,7 +41,7 @@ class Matrix<T: Number>(val value: Array<Array<T>>) {
         return Matrix(result)
     }
 
-    operator fun times(other: Matrix<T>): Matrix<Double> {
+    operator fun times(other: Matrix): Matrix {
         if (this.value[0].size != other.value.size) {
             throw IllegalArgumentException("Number of columns of the first matrix must equal the number of rows of the second matrix")
         }
@@ -59,11 +59,13 @@ class Matrix<T: Number>(val value: Array<Array<T>>) {
         return Matrix(result)
     }
 
-    operator fun unaryMinus() {
+    operator fun unaryMinus(): Matrix {
+        val result = Matrix(Array(this.value.size) { Array(this.value[0].size) { 0.0 } })
         for (i in this.value.indices) {
             for (j in this.value[i].indices) {
-                this[i, j] = -(this.value[i][j] as Double) as T
+                result[i, j] = -this.value[i][j]
             }
         }
+        return result
     }
 }

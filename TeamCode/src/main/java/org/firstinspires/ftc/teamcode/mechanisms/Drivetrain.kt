@@ -20,8 +20,8 @@ import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.Matrix
+import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.getByName
-import kotlin.compareTo
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.absoluteValue
@@ -29,9 +29,8 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.time.Duration
-import kotlin.unaryMinus
 
-class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, odometry: Odometry?) : System(), Controllable<BaseProfile> {
+class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, val odometry: Odometry?) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
         /** Movement is relative to the robot */
         ROBOT,
@@ -63,7 +62,7 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, odometry: Odom
         val yProfile = MotionProfile(yJerk, yMaxAcceleration, yMaxVelocity)
         val angularProfile = MotionProfile(angularJerk.radians, angularMaxAcceleration.radians, angularMaxVelocity.radians)
 
-        val K: Matrix<Number> = Matrix(
+        val K: Matrix = Matrix(
             arrayOf(
                 arrayOf(0.1570535, 0.1570535, -0.10915114, 0.16505644, 0.16505644, -0.05081128),
                 arrayOf(-0.1570535, 0.1570535, 0.10915114, -0.16505644, 0.16505644, 0.05081128),
@@ -92,14 +91,12 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, odometry: Odom
     private var rotation = 0.0
 
     override val beforeRun = Command.continuous("Motor Power Calculation", data) {
-        if (it.isInTeleop) {
-            if (odometry != null) {
-                if (it.xControl.absoluteValue > .05) {
-                    targetHeading = odometry.position.radians % (2 * PI)
-                }
-                if (it.xControl.absoluteValue > .05) {
-                    rotation = -it.xControl
+        if (odometry != null) {
+            if (it.isInTeleop) {
+                if (it.rotControl.absoluteValue > .05) {
+                    rotation = it.rotControl
                     timeLetGo = it.enteredAt?.elapsedNow() ?: Duration.ZERO
+                    targetHeading = odometry.position.radians % (2 * PI)
                 } else {
                     val shortestPath = atan2(
                         sin(odometry.position.radians - targetHeading),
@@ -108,19 +105,104 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, odometry: Odom
                     rotation = -headingPID.compute(0.0, shortestPath) / PI
                 }
             }
-        } else {
-
         }
     }
+
+    var errorState: Matrix? = null
 
     override val afterRun = Command.continuous("Drivetrain Update", data) {
-        if (it.isInTeleop) {
-
-        } else {
-
+        if (odometry != null) {
+            if (it.isInTeleop) {
+                val powers = calculatePowers(it.xControl, it.yControl, rotation)
+                motors.setPower(powers)
+            } else {
+                if (errorState != null) {
+                    val controlMatrix = -K * errorState!!
+                    motors.setPower(controlMatrix)
+                } else {
+                    stop()
+                }
+            }
         }
     }
 
+    fun moveToPosition(targetPose: Pose) = Command.create("Move to Position") {
+        var xResult: MotionProfile.MotionResult? = null
+        var yResult: MotionProfile.MotionResult? = null
+        var angularResult: MotionProfile.MotionResult? = null
+        enter {
+            val currentPose = odometry!!.position
+            xResult = xProfile.generate(currentPose.x, targetPose.x)
+            yResult = yProfile.generate(currentPose.y, targetPose.y)
+            angularResult = angularProfile.generate(currentPose.radians, targetPose.radians)
+        }
+
+        action {
+            val currentPose = odometry!!.position
+            val currentVelocity = odometry.velocity
+            val time = it.enteredAt?.elapsedNow() ?: Duration.ZERO
+
+            val x = currentPose.x - (xResult?.getPosition(time) ?: 0.0)
+            val y = currentPose.y - (yResult?.getPosition(time) ?: 0.0)
+            val rot = currentPose.radians - (angularResult?.getPosition(time) ?: 0.0)
+            val vx = currentVelocity.x - (xResult?.getVelocity(time) ?: 0.0)
+            val vy = currentVelocity.y - (yResult?.getVelocity(time) ?: 0.0)
+            val w = currentVelocity.radians - (angularResult?.getVelocity(time) ?: 0.0)
+
+            errorState = Matrix(
+                arrayOf(
+                    arrayOf(x, y, rot, vx, vy, w)
+                )
+            )
+
+            if (currentPose.within(targetPose, Pose(10,10,5))) {
+                stop()
+            }
+        }
+
+        exit {
+            errorState = null
+        }
+    }
+
+    fun mtpNoProfile(targetPose: Pose) = Command.create("Move to Position") {
+        action {
+            val currentPose = odometry!!.position
+            val error = currentPose - targetPose
+
+            val x = error.x
+            val y = error.y
+            val rot = error.radians
+            val vx = 0.0
+            val vy = 0.0
+            val w = 0.0
+
+            errorState = Matrix(
+                arrayOf(
+                    arrayOf(x, y, rot, vx, vy, w)
+                )
+            )
+
+            if (currentPose.within(targetPose, Pose(10, 10, 5))) {
+                stop()
+            }
+        }
+
+        exit {
+            errorState = null
+        }
+    }
+
+    fun calculatePowers(x: Double, y: Double, rotation: Double): List<Double> {
+        val frontLeft = y - x + rotation
+        val frontRight = y + x - rotation
+        val backLeft = y + x + rotation
+        val backRight = y - x - rotation
+
+        val powers = listOf(-frontLeft, -backLeft, frontRight, backRight)
+
+        return powers.map { it }
+    }
 
     fun stop() {
         motors.setPower(0.0, 0.0, 0.0, 0.0)
@@ -171,8 +253,11 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, odometry: Odom
 
             WebData.setDrivetrain(frontLeft, -frontRight, backLeft, -backRight)
         }
-        fun setPower(matrix: Matrix<Number>) {
+        fun setPower(matrix: Matrix) {
             setPower(matrix[0, 0], matrix[0, 1], matrix[0, 2], matrix[0, 3])
+        }
+        fun setPower(powers: List<Double>) {
+            setPower(powers[0], powers[1], powers[2], powers[3])
         }
 
         override operator fun iterator() = listOf(frontLeft, frontRight, backLeft, backRight).iterator()
