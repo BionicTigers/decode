@@ -30,7 +30,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.time.Duration
 
-class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, val odometry: Odometry?) : System(), Controllable<BaseProfile> {
+class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry?) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
         /** Movement is relative to the robot */
         ROBOT,
@@ -64,10 +64,10 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, val odometry: 
 
         val K: Matrix = Matrix(
             arrayOf(
-                arrayOf(0.1570535, 0.1570535, -0.10915114, 0.16505644, 0.16505644, -0.05081128),
-                arrayOf(-0.1570535, 0.1570535, 0.10915114, -0.16505644, 0.16505644, 0.05081128),
-                arrayOf(-0.1570535, 0.1570535, -0.10915114, -0.16505644, 0.16505644, -0.05081128),
-                arrayOf(0.1570535, 0.1570535, 0.10915114, 0.16505644, 0.16505644, 0.05081128)
+            arrayOf(0.15638948, 0.15638948, -0.05931547, 0.10198206, 0.10198206, 0.00310677),
+            arrayOf(-0.15638948, 0.15638948, 0.05931547, -0.10198206, 0.10198206, -0.00310677),
+            arrayOf(-0.15638948, 0.15638948, -0.05931547, -0.10198206, 0.10198206, 0.00310677),
+            arrayOf(0.15638948, 0.15638948, 0.05931547, 0.10198206, 0.10198206, -0.00310677)
             )
         )
     }
@@ -158,6 +158,8 @@ class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?, val odometry: 
             if (currentPose.within(targetPose, Pose(10,10,5))) {
                 stop()
             }
+
+            telemetry?.addData("Target Pose", targetPose)
         }
 
         exit {
