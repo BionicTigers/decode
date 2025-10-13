@@ -11,9 +11,9 @@ open class BaseProfile {
     val drivetrain = object : Drivetrain.Schema {
         override val desiredGamepad = Gamepads.GAMEPAD_1
         override val orientation = Drivetrain.DriveOrientation.ROBOT
-        override val x = Analog.LEFT_STICK_X
-        override val y = Analog.LEFT_STICK_Y
-        override val rot = Analog.RIGHT_STICK_X
+        override val x = Analog.LEFT_STICK_X.continuous()
+        override val y = Analog.LEFT_STICK_Y.continuous()
+        override val rot = Analog.RIGHT_STICK_X.continuous()
     }
 
     val intake = object : Intake.Schema {

@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
@@ -21,6 +22,10 @@ class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
+
+    init {
+        motor.direction = DcMotorSimple.Direction.REVERSE
+    }
 
     fun intake() = Command.instant {
         motor.power = 1.0

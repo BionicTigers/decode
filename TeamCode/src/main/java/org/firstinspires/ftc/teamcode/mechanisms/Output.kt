@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
+import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
@@ -22,11 +24,16 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
 
-    fun shoot() = Command.instant {
+    init {
+        motor.direction = DcMotorSimple.Direction.REVERSE
+        motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+    }
+
+    fun shoot() = SystemCommand.instant {
         motor.power = 1.0
     }
 
-    fun stop() = Command.instant {
+    fun stop() = SystemCommand.instant {
         motor.power = 0.0
     }
 

@@ -33,8 +33,8 @@ object Configs {
     }
 
     object Main: RobotConfig {
-        override val forwardOffset: Distance = Distance.mm(0.0) // TODO: Set actual value
-        override val strafeOffset: Distance = Distance.mm(0.0) // TODO: Set actual value
+        override val forwardOffset: Distance = Distance.mm(175.0) // TODO: Set actual value
+        override val strafeOffset: Distance = Distance.mm(90.0) // TODO: Set actual value
     }
 }
 
@@ -72,11 +72,11 @@ class Odometry(
      * Takes .25 seconds, robot must be stationary for the whole .25 seconds.
      * It is recommended that the imu is recalibrated before each use (at the start of an auto or teleop).
      */
-    val recalibrate: Command<BaseCommandState> = Command.instant("Odometry Recalibrate") {
+    val recalibrate: Command<BaseCommandState> = SystemCommand.instant("Odometry Recalibrate") {
         pinpoint.recalibrateIMU()
     }
 
-    override val beforeRun = Command.continuous("Odometry Update") {
+    override val beforeRun = SystemCommand.continuous("Odometry Update") {
         pinpoint.update()
 
         position = Pose(
@@ -95,7 +95,7 @@ class Odometry(
     private var loopTimeTooLowWarning: Telemetry.Line? = null
     private var loopTimeTooHighWarning: Telemetry.Line? = null
 
-    override val afterRun = Command.continuous("Odometry Check") {
+    override val afterRun = SystemCommand.continuous("Odometry Check") {
         if (pinpoint.loopTime < 500)
             if (loopTimeTooLowWarning == null)
                 loopTimeTooLowWarning = telemetry?.addLine("Loop time is lower than 500ms, odometry may not be accurate/something may be wrong with pods according to the GoBilda documentation.")
