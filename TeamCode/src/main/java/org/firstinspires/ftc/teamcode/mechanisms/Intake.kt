@@ -28,7 +28,7 @@ class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     }
 
     fun intake() = Command.instant {
-        motor.power = 1.0
+        motor.power = 0.8
     }
 
     fun stop() = Command.instant {

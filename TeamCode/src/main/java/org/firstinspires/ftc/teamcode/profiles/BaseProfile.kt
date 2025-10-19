@@ -5,7 +5,9 @@ import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
+import org.firstinspires.ftc.teamcode.mechanisms.Kicker
 import org.firstinspires.ftc.teamcode.mechanisms.Output
+import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 
 open class BaseProfile {
     val drivetrain = object : Drivetrain.Schema {
@@ -25,6 +27,17 @@ open class BaseProfile {
     val output = object : Output.Schema {
         override val shoot = Digital.Y
         override val stop = Digital.X
+        override val desiredGamepad = Gamepads.GAMEPAD_2
+    }
+
+    val sorter = object : Sorter.Schema {
+        override val forward = Digital.RIGHT_BUMPER.release()
+        override val backward = Digital.LEFT_BUMPER.release()
+        override val desiredGamepad = Gamepads.GAMEPAD_2
+    }
+
+    val kicker = object : Kicker.Schema {
+        override val kick : Digital = Digital.DPAD_UP
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 

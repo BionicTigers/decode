@@ -108,10 +108,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         }
 
-        Server.OnDrivetrainUpdate = { x, y, r ->
-            println("$x, $y, $r")
-            Scheduler.schedule(setXControl(x), setYControl(y), setRotControl(r))
-        }
+//        Server.OnDrivetrainUpdate = { x, y, r ->
+//            println("$x, $y, $r")
+//            Scheduler.schedule(setXControl(x), setYControl(y), setRotControl(r))
+//        }
     }
 
     override val dependencies: List<System> = listOfNotNull(odometry)

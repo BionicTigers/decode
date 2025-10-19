@@ -30,7 +30,7 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     }
 
     fun shoot() = SystemCommand.instant {
-        motor.power = 1.0
+        motor.power = 0.9
     }
 
     fun stop() = SystemCommand.instant {
