@@ -21,8 +21,8 @@ open class BaseProfile {
     val intake = object : Intake.Schema {
         override val intake = Digital.A
         override val stop = Digital.B
-        override val speedUp = Digital.DPAD_UP
-        override val speedDown = Digital.DPAD_DOWN
+        override val speedUp = Digital.DPAD_RIGHT
+        override val speedDown = Digital.DPAD_LEFT
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
