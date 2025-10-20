@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
+import io.github.bionictigers.axiom.core.commands.BaseCommandState
 import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
@@ -20,6 +21,8 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     interface Schema : ControlSchema {
         val shoot: Digital
         val stop: Digital
+        val speedUp: Digital
+        val speedDown: Digital
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
@@ -29,12 +32,27 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
 
-    fun shoot() = SystemCommand.instant {
-        motor.power = 0.9
+    var state = StateOutput()
+
+    fun shoot() = SystemCommand.instant("turn on output", state) {
+        motor.power = it.newSpeed
     }
 
     fun stop() = SystemCommand.instant {
         motor.power = 0.0
+    }
+
+    fun speedUp() = Command.instant("output increase",state) {
+        it.newSpeed = motor.power + 0.1
+        if (it.newSpeed >= 1.0) {motor.power = 1.0; it.newSpeed = 1.0}
+        it.newSpeed = motor.power
+    }
+
+    fun slowDown() = Command.instant("output decrease",state) {
+
+        it.newSpeed = motor.power - 0.1
+        if (it.newSpeed <= 0.0) {motor.power = 0.0; it.newSpeed = 0.0}
+        it. newSpeed = motor.power
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -43,4 +61,5 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
             builder.register(stop) { stop() }
         }
     }
+    data class StateOutput(var newSpeed: Double = 0.9): BaseCommandState()
 }

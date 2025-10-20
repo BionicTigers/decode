@@ -21,12 +21,16 @@ open class BaseProfile {
     val intake = object : Intake.Schema {
         override val intake = Digital.A
         override val stop = Digital.B
+        override val speedUp = Digital.DPAD_UP
+        override val speedDown = Digital.DPAD_DOWN
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
     val output = object : Output.Schema {
         override val shoot = Digital.Y
         override val stop = Digital.X
+        override val speedDown = Digital.DPAD_DOWN
+        override val speedUp = Digital.DPAD_UP
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
@@ -38,7 +42,7 @@ open class BaseProfile {
 
     val kicker = object : Kicker.Schema {
         override val kick : Digital = Digital.DPAD_UP
-        override val desiredGamepad = Gamepads.GAMEPAD_2
+        override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
     companion object {
