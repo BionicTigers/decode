@@ -35,7 +35,7 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     var state = StateOutput()
 
     fun shoot() = SystemCommand.instant("turn on output", state) {
-        motor.power = it.newSpeed
+        motor.power = it.speed
     }
 
     fun stop() = SystemCommand.instant {
@@ -43,23 +43,25 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     }
 
     fun speedUp() = Command.instant("output increase",state) {
-        it.newSpeed = motor.power + 0.1
-        if (it.newSpeed >= 1.0) {motor.power = 1.0; it.newSpeed = 1.0}
-        it.newSpeed = motor.power
+        it.speed = motor.power + 0.1
+        if (it.speed >= 1.0) { it.speed = 1.0 }
+        motor.power = it.speed
     }
 
     fun slowDown() = Command.instant("output decrease",state) {
 
-        it.newSpeed = motor.power - 0.1
-        if (it.newSpeed <= 0.0) {motor.power = 0.0; it.newSpeed = 0.0}
-        it. newSpeed = motor.power
+        it.speed = motor.power - 0.1
+        if (it.speed <= 0.0) { it.speed = 0.0 }
+        motor.power = it.speed
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
             builder.register(shoot) { shoot() }
             builder.register(stop) { stop() }
+            builder.register(speedUp) { speedUp() }
+            builder.register(speedDown) { slowDown() }
         }
     }
-    data class StateOutput(var newSpeed: Double = 0.9): BaseCommandState()
+    data class StateOutput(var speed: Double = 0.9): BaseCommandState()
 }

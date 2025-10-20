@@ -12,7 +12,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 
-@TeleOp(name = "Anything please")
+@TeleOp(name = "Main Control")
 class MainControl : LinearOpMode() {
     override fun runOpMode() {
         val odometry = Odometry(hardwareMap, telemetry)

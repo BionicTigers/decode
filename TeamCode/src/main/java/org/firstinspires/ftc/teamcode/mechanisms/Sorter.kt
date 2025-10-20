@@ -21,6 +21,7 @@ import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 class Sorter(hardwareMap: HardwareMap, telemetry: Telemetry): System(), Controllable<BaseProfile> {
@@ -40,50 +41,66 @@ class Sorter(hardwareMap: HardwareMap, telemetry: Telemetry): System(), Controll
 
     init {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        motor.direction = DcMotorSimple.Direction.REVERSE
         hub.setJunkTicks(3)
         pid.reset()
     }
 
-    override val beforeRun = SystemCommand.continuous("Sorter Update", state) {
+//    override val beforeRun = SystemCommand.continuous("Sorter Update", state) {
+//        hub.refreshBulkData()
+//
+//        val deltaTicks = hub.getEncoderTicks(3)
+//
+//        it.angle -= (deltaTicks / 8192.0) * 360.0
+//
+//        if (it.angle < 0) {
+//            it.angle += 360.0
+//        }
+//
+//        it.angle %= 360.0
+//
+//        telemetry.addData("step", it.step)
+//        telemetry.addData("ticks from encoder", hub.getEncoderTicks(3))
+//        telemetry.addData("angle", it.angle)
+//        telemetry.addData("target", it.target)
+//        telemetry.addData("power", motor.power)
+//
+//        when (it.step) {
+//            1 -> it.target = 0.0
+//            2 -> it.target = 120.0
+//            3 -> it.target = 240.0
+//        }
+//
+//        val error = Math.toDegrees(
+//            atan2(
+//                sin(Math.toRadians(it.target - it.angle)),
+//                cos(Math.toRadians(it.target - it.angle))
+//            )
+//        )
+//
+//        telemetry.addData("error", error)
+//
+//        if (abs(error) > 5)
+//            motor.power = pid.compute(0.0, error)
+//        else
+//            motor.power = 0.0
+//
+//        hub.setJunkTicks()
+//    }
+
+    override val beforeRun = SystemCommand.continuous("Sorter Update Simple", state) {
         hub.refreshBulkData()
 
-        val deltaTicks = hub.getEncoderTicks(3)
+        it.ticks = hub.getEncoderTicks(3).toDouble()
 
-        it.angle -= (deltaTicks / 8192.0) * 360.0
-
-        if (it.angle < 0) {
-            it.angle += 360.0
-        }
-
-        it.angle %= 360.0
-
-        telemetry.addData("step", it.step)
-        telemetry.addData("ticks from encoder", hub.getEncoderTicks(3))
-        telemetry.addData("angle", it.angle)
+        telemetry.addData("ticks from encoder", it.ticks)
         telemetry.addData("target", it.target)
         telemetry.addData("power", motor.power)
 
-        when (it.step) {
-            1 -> it.target = 0.0
-            2 -> it.target = 120.0
-            3 -> it.target = 240.0
-        }
-
-        val error = Math.toDegrees(
-            atan2(
-                sin(Math.toRadians(it.target - it.angle)),
-                cos(Math.toRadians(it.target - it.angle))
-            )
-        )
-
-        telemetry.addData("error", error)
-
-        if (abs(error) > 5)
-            motor.power = pid.compute(0.0, error)
+        if (abs(it.target - it.ticks) > 5)
+            motor.power = pid.compute(it.ticks, it.target)
         else
             motor.power = 0.0
-
-        hub.setJunkTicks()
     }
 
     fun moveForward() = SystemCommand.instant("sorter increment", state) {
@@ -98,24 +115,25 @@ class Sorter(hardwareMap: HardwareMap, telemetry: Telemetry): System(), Controll
 //        pid.reset()
     }
 
-//    fun forward() = SystemCommand.instant(state = state) {
-//        motor.power = .3
-//    }
-//
-//    fun backward() = SystemCommand.instant(state = state) {
-//        motor.power = -0.3
-//    }
+    fun forward() = SystemCommand.instant("sorter forward", state) {
+        it.target = (it.ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 + 8192.0 / 3.0
+    }
+
+    fun backward() = SystemCommand.instant("sorter forward", state) {
+        it.target = (it.ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 - 8192.0 / 3.0
+    }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.sorter) {
-            builder.register(forward) { moveForward() }
-            builder.register(backward) { moveBackward() }
+            builder.register(forward) { forward() }
+            builder.register(backward) { backward() }
         }
     }
     data class SorterState(
         val hub: ControlHub,
         var step: Int = 1,
         var angle: Double = 0.0,
-        var target: Double = 0.0
+        var target: Double = 0.0,
+        var ticks: Double = 0.0
     ) : BaseCommandState()
 }
