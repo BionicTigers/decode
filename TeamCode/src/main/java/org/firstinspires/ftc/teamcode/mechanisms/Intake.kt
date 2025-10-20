@@ -26,13 +26,25 @@ class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
     }
-
+    var newSpeed = 0.8
     fun intake() = Command.instant {
-        motor.power = 0.8
+        motor.power = newSpeed
     }
 
     fun stop() = Command.instant {
         motor.power = 0.0
+    }
+
+    fun speedUp() = Command.instant {
+         newSpeed = motor.power + 0.1
+        if (newSpeed >= 1.0) {motor.power = 1.0; newSpeed = 1.0}
+        newSpeed = motor.power
+    }
+
+    fun slowDown() = Command.instant {
+         newSpeed = motor.power - 0.1
+        if (newSpeed <= 0.0) {motor.power = 0.0; newSpeed = 0.0}
+        newSpeed = motor.power
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -41,4 +53,5 @@ class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
             builder.register(stop) { stop() }
         }
     }
+
 }

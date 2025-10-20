@@ -34,7 +34,7 @@ class Sorter(hardwareMap: HardwareMap, telemetry: Telemetry): System(), Controll
 
     val motor = hardwareMap.getByName<DcMotorEx>("sorter")
     val hub = ControlHub(hardwareMap, "Control Hub")
-    val pid = PID(.5, 0.0, 0.0, 0.0, 0.0, 360.0, -0.5, 0.5)
+    val pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 360.0, -0.5, 0.5)
 
     val state = SorterState(hub)
 
@@ -94,7 +94,7 @@ class Sorter(hardwareMap: HardwareMap, telemetry: Telemetry): System(), Controll
 
     fun moveBackward() = SystemCommand.instant("sorter decrement", state) {
         it.step--
-        if (it.step < 0) it.step = 3
+        if (it.step < 1) it.step = 3
 //        pid.reset()
     }
 
