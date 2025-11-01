@@ -11,7 +11,9 @@ import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
+import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
+import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
@@ -28,33 +30,50 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
 
     val state = KickerState(TimeSource.Monotonic.markNow())
 
-    val defaultPosition = 0.0
-    val kickPosition = 0.8
-
     interface Schema : ControlSchema {
-        val kick: Digital
+        val kick: Digital?
+        val up: Digital?
     }
 
     override val beforeRun = SystemCommand.continuous("Kicker Update", state) {
-        if (it.lastKickedAt.elapsedNow() > 250.milliseconds) {
-            servo.position = defaultPosition
+        it.kickedThisCycle = false
+        if (it.lastKickedAt.elapsedNow() > 250.milliseconds && it.reset) {
+            servo.position = it.defaultPosition
+            it.reset = false
         }
     }
 
     val servo = hardwareMap.getByName<Servo>("kicker")
 
     fun kick() = SystemCommand.instant("Kick", state) {
-        servo.position = kickPosition
+        servo.position = it.kickPosition
         it.lastKickedAt = TimeSource.Monotonic.markNow()
-        println("kick")
+        it.reset = true
+        it.kickedThisCycle = true
+    }
+
+    fun up() = SystemCommand.instant("Up", state) {
+        servo.position = it.upPosition
+        it.reset = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.kicker) {
-            builder.register(kick) { kick() }
+            if (!desiredGamepad.matches(gamepad)) return
+
+            kick?.let { builder.register(it) { kick() } }
+            up?.let { builder.register(it) { up() } }
         }
     }
     data class KickerState(
-        var lastKickedAt: TimeMark
+        var lastKickedAt: TimeMark,
+        @Editable
+        var defaultPosition: Double = .95,
+        @Editable
+        var kickPosition: Double = 0.0,
+        @Editable
+        var upPosition: Double = 0.0,
+        var reset: Boolean = false,
+        var kickedThisCycle: Boolean = false
     ) : BaseCommandState()
 }

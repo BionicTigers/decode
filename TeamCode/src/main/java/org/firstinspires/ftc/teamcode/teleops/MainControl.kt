@@ -15,18 +15,20 @@ import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 @TeleOp(name = "Main Control")
 class MainControl : LinearOpMode() {
     override fun runOpMode() {
-        val odometry = Odometry(hardwareMap, telemetry)
-        val drivetrain = Drivetrain(hardwareMap, telemetry, odometry)
-        val intake = Intake(hardwareMap)
-        val sorter = Sorter(hardwareMap, telemetry)
-        val output = Output(hardwareMap)
+        Scheduler.reset()
+
+//        val odometry = Odometry(hardwareMap, telemetry)
+        val drivetrain = Drivetrain(hardwareMap, telemetry)
+        val intake = Intake(hardwareMap, drivetrain)
         val kicker = Kicker(hardwareMap)
+        val sorter = Sorter(hardwareMap, kicker, telemetry)
+        val output = Output(hardwareMap)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )
 
         Scheduler.telemetry = telemetry
-        Scheduler.schedule(drivetrain, controls, odometry, intake, sorter, output, kicker)
+        Scheduler.schedule(drivetrain, controls, intake, sorter, output, kicker)
 
         waitForStart()
 
@@ -34,5 +36,7 @@ class MainControl : LinearOpMode() {
             Scheduler.update()
             telemetry.update()
         }
+
+        Scheduler.reset()
     }
 }

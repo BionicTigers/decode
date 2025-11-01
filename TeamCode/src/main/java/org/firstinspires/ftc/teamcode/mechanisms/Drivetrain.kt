@@ -123,13 +123,12 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     override val beforeRun = SystemCommand.continuous("Motor Power Calculation", data) {
         if (it.isInTeleop) {
-            if (odometry != null) {
+//            if (odometry != null) {
                 if (it.rotControl.absoluteValue > .05) {
                     rotation = it.rotControl
                     timeLetGo = TimeSource.Monotonic.markNow()
-                    targetHeading = odometry.position.radians % (2 * PI)
+//                    targetHeading = odometry.position.radians % (2 * PI)
                 } else {
-                    println("stop")
                     rotation = 0.0
 //                } else {
 //                    val shortestPath = atan2(
@@ -141,7 +140,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 //                }
                 }
             }
-        }
+//        }
     }
 
     var errorState: Matrix? = null

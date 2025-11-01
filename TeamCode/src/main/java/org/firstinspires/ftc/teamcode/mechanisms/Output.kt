@@ -11,6 +11,7 @@ import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
+import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.getByName
@@ -19,10 +20,9 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
 
     interface Schema : ControlSchema {
-        val shoot: Digital
-        val stop: Digital
-        val speedUp: Digital
-        val speedDown: Digital
+        val shoot: Digital?
+        val stop: Digital?
+        val toggle: Digital?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
@@ -34,34 +34,24 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
 
     var state = StateOutput()
 
-    fun shoot() = SystemCommand.instant("turn on output", state) {
+    fun shoot() = SystemCommand.instant("Output Enable", state) {
         motor.power = it.speed
+        it.active = true
     }
 
-    fun stop() = SystemCommand.instant {
+    fun stop() = SystemCommand.instant("Output Disable", state) {
         motor.power = 0.0
-    }
-
-    fun speedUp() = Command.instant("output increase",state) {
-        it.speed = motor.power + 0.1
-        if (it.speed >= 1.0) { it.speed = 1.0 }
-        motor.power = it.speed
-    }
-
-    fun slowDown() = Command.instant("output decrease",state) {
-
-        it.speed = motor.power - 0.1
-        if (it.speed <= 0.0) { it.speed = 0.0 }
-        motor.power = it.speed
+        it.active = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
-            builder.register(shoot) { shoot() }
-            builder.register(stop) { stop() }
-            builder.register(speedUp) { speedUp() }
-            builder.register(speedDown) { slowDown() }
+            if (!desiredGamepad.matches(gamepad)) return
+
+            shoot?.let { builder.register(it) { shoot() } }
+            stop?.let { builder.register(it) { stop() } }
+            toggle?.let { builder.register(it) { if (state.active) stop() else shoot() } }
         }
     }
-    data class StateOutput(var speed: Double = 0.9): BaseCommandState()
+    data class StateOutput(var speed: Double = 0.9, var active: Boolean = false): BaseCommandState()
 }

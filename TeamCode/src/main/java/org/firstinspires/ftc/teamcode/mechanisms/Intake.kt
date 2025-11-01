@@ -10,19 +10,19 @@ import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
+import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.min
 
-class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
+class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Intake"
 
     interface Schema : ControlSchema {
-        val intake: Digital
-        val stop: Digital
-        val speedUp: Digital
-        val speedDown: Digital
+        val intake: Digital?
+        val stop: Digital?
+        val toggle: Digital?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
@@ -30,35 +30,37 @@ class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
     }
+
     var state = StateIntake()
 
-    fun intake() = Command.instant("Intake Enable", state) {
-        motor.power = it.speed
+    override val afterRun = SystemCommand.continuous("Intake After Run", state) {
+        if (it.active) {
+            val power = (1.0 - state.stillSpeed) + (drivetrain?.data?.yControl ?: 1.0) * state.stillSpeed
+            if (motor.power != power) motor.power = power
+        }
     }
 
-    fun stop() = Command.instant {
+    fun intake() = SystemCommand.instant("Intake Enable", state) {
+        it.active = true
+    }
+
+    fun stop() = SystemCommand.instant("Intake Disable", state) {
         motor.power = 0.0
-    }
-
-    fun speedUp() = Command.instant("intake Increase",state) {
-        it.speed = (it.speed + 0.1).coerceIn(0.0, 1.0)
-        motor.power = it.speed
-    }
-
-    fun slowDown() = Command.instant("intake decrease",state) {
-        it.speed = (it.speed - 0.1).coerceIn(0.0, 1.0)
-        motor.power = it.speed
+        it.active = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.intake) {
-            builder.register(intake) { intake() }
-            builder.register(stop) { stop() }
-            builder.register(speedUp) { speedUp() }
-            builder.register(speedDown) { slowDown() }
+            if (!desiredGamepad.matches(gamepad)) return
+
+            intake?.let { builder.register(it) { intake() } }
+            stop?.let { builder.register(it) { stop() } }
+            toggle?.let { builder.register(it) { if (state.active) stop() else intake() } }
         }
     }
-    data class StateIntake(var speed: Double = 0.8): BaseCommandState()
 
-
+    data class StateIntake(
+        var active: Boolean = false,
+        var stillSpeed: Double = .5
+    ): BaseCommandState()
 }

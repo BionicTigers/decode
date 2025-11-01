@@ -19,30 +19,33 @@ open class BaseProfile {
     }
 
     val intake = object : Intake.Schema {
-        override val intake = Digital.A
-        override val stop = Digital.B
-        override val speedUp = Digital.DPAD_RIGHT
-        override val speedDown = Digital.DPAD_LEFT
-        override val desiredGamepad = Gamepads.GAMEPAD_2
+        override val intake = null
+        override val stop = null
+        override val toggle = Digital.A.press()
+        override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
     val output = object : Output.Schema {
-        override val shoot = Digital.Y
-        override val stop = Digital.X
-        override val speedDown = Digital.DPAD_DOWN
-        override val speedUp = Digital.DPAD_UP
+        override val shoot = null
+        override val stop = null
+        override val toggle = Digital.Y.press()
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
     val sorter = object : Sorter.Schema {
-        override val forward = Digital.RIGHT_BUMPER.release()
-        override val backward = Digital.LEFT_BUMPER.release()
+        override val forward = Digital.RIGHT_BUMPER.press()
+        override val backward = Digital.LEFT_BUMPER.press()
+        override val green = Digital.DPAD_LEFT.press()
+        override val purple = Digital.DPAD_RIGHT.press()
+        override val openIntake = Digital.DPAD_DOWN.press()
+        override val openHuman = null
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
     val kicker = object : Kicker.Schema {
-        override val kick : Digital = Digital.DPAD_UP
-        override val desiredGamepad = Gamepads.GAMEPAD_1
+        override val kick : Digital = Digital.X.press()
+        override val up : Digital = Digital.DPAD_UP.press()
+        override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
     companion object {
