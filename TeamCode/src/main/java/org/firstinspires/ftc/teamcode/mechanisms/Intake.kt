@@ -35,7 +35,7 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
 
     override val afterRun = SystemCommand.continuous("Intake After Run", state) {
         if (it.active) {
-            val power = (1.0 - state.stillSpeed) + (drivetrain?.data?.yControl ?: 1.0) * state.stillSpeed
+            val power = state.stillSpeed + (drivetrain?.data?.yControl ?: 1.0) * (1.0 - state.stillSpeed)
             if (motor.power != power) motor.power = power
         }
     }
@@ -61,6 +61,6 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
 
     data class StateIntake(
         var active: Boolean = false,
-        var stillSpeed: Double = .5
+        var stillSpeed: Double = .7
     ): BaseCommandState()
 }

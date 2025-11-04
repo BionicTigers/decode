@@ -96,7 +96,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             2 -> it.target = 240.0
         }
 
-        val error = Math.toDegrees(
+        val error = -Math.toDegrees(
             atan2(
                 sin(Math.toRadians(it.target - it.angle)),
                 cos(Math.toRadians(it.target - it.angle))
@@ -105,13 +105,13 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
         telemetry?.addData("error", error)
 
-        if (abs(error) > 1)
+        if (abs(error) > .5)
             motor.power = -it.pid.compute(0.0, error)
         else
             motor.power = 0.0
 
         if (kicker?.state?.reset ?: false)
-            motor.power += .1
+            motor.power -= .2
 
         hub.setJunkTicks()
     }
@@ -227,11 +227,11 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     }
     data class SorterState(
         val hub: ControlHub,
-        var step: Int = 1,
+        var step: Int = 0,
         var angle: Double = 0.0,
         var target: Double = 0.0,
         var ticks: Double = 0.0,
-        val pid: PID = PID(2.0, 0.0, 0.0, 0.0, 0.0, 360.0, -0.65, 0.65),
+        val pid: PID = PID(2.0, 0.0, 0.0, 0.0, -180.0, 180.0, -.35, .35),
         val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
     ) : BaseCommandState()
 }

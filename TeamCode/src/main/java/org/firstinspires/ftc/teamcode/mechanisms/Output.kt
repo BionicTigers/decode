@@ -13,6 +13,7 @@ import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
+import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.getByName
 
@@ -53,5 +54,9 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
             toggle?.let { builder.register(it) { if (state.active) stop() else shoot() } }
         }
     }
-    data class StateOutput(var speed: Double = 0.9, var active: Boolean = false): BaseCommandState()
+    data class StateOutput(
+        @Editable
+        var speed: Double = 0.9,
+        var active: Boolean = false
+    ): BaseCommandState()
 }

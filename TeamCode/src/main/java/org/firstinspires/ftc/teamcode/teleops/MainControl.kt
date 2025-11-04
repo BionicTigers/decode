@@ -11,13 +11,17 @@ import org.firstinspires.ftc.teamcode.mechanisms.Output
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
+import kotlin.time.measureTime
 
 @TeleOp(name = "Main Control")
 class MainControl : LinearOpMode() {
     override fun runOpMode() {
-        Scheduler.reset()
+            Scheduler.reset()
 
 //        val odometry = Odometry(hardwareMap, telemetry)
+        val b = TimeSource.Monotonic.markNow()
         val drivetrain = Drivetrain(hardwareMap, telemetry)
         val intake = Intake(hardwareMap, drivetrain)
         val kicker = Kicker(hardwareMap)
