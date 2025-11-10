@@ -15,6 +15,8 @@ import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.robotcore.external.Telemetry
+import org.firstinspires.ftc.teamcode.control.DynamicPID
+import org.firstinspires.ftc.teamcode.control.GainSchedule
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
@@ -25,6 +27,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Sorter"
@@ -225,13 +228,22 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             openHuman?.let { builder.register(it) { openHuman() } }
         }
     }
+
     data class SorterState(
         val hub: ControlHub,
         var step: Int = 0,
         var angle: Double = 0.0,
         var target: Double = 0.0,
         var ticks: Double = 0.0,
-        val pid: PID = PID(2.0, 0.0, 0.0, 0.0, -180.0, 180.0, -.35, .35),
+        val pid: DynamicPID = DynamicPID(GainSchedule(
+            mapOf(
+                0.0 to 2.0,
+                90.0 to 1.5,
+                180.0 to .75,
+            ),
+            mapOf(0.0 to 0.0),
+            mapOf(0.0 to 0.0)
+        ), 0.0, -180.0, 180.0, -.75, .75, 20.milliseconds, { abs(it) }),
         val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
     ) : BaseCommandState()
 }

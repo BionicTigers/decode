@@ -68,9 +68,9 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
     data class KickerState(
         var lastKickedAt: TimeMark,
         @Editable
-        var defaultPosition: Double = .95,
+        var defaultPosition: Double = 0.35,
         @Editable
-        var kickPosition: Double = 0.0,
+        var kickPosition: Double = .95,
         @Editable
         var upPosition: Double = 0.0,
         var reset: Boolean = false,

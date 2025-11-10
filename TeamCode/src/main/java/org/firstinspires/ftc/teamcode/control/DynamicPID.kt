@@ -47,12 +47,12 @@ class DynamicPID(
     cvMin: Double = -1.0,
     cvMax: Double = 1.0,
     sampleTime: Duration = 20.milliseconds,
-    val indexProvider: () -> Number,
+    val indexProvider: (error: Double) -> Number,
     feedforward: (setpoint: Double, setpointRate: Double) -> Double = { _, _ -> 0.0 }
 ) : PID(
-    schedule[indexProvider()].first,
-    schedule[indexProvider()].second,
-    schedule[indexProvider()].third,
+    schedule[indexProvider(0.0)].first,
+    schedule[indexProvider(0.0)].second,
+    schedule[indexProvider(0.0)].third,
     kAW,
     pvMin,
     pvMax,
@@ -63,7 +63,7 @@ class DynamicPID(
 ) {
     @Display()
     val index: Double
-        get() = indexProvider().toDouble()
+        get() = indexProvider(error).toDouble()
 
     fun updateGains() {
         val (kP, tI, tD) = schedule[index]

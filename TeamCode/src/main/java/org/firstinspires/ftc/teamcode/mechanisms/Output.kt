@@ -14,10 +14,14 @@ import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
+import org.firstinspires.ftc.robotcore.external.Telemetry
+import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
+import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
 
     interface Schema : ControlSchema {
@@ -31,12 +35,25 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        motor.mode == DcMotor.RunMode.RUN_WITHOUT_ENCODER
     }
 
     var state = StateOutput()
 
+    override val beforeRun = SystemCommand.continuous("Output Data", state) {
+        it.velocity = motor.velocity
+        it.maxVelocity = max(it.velocity, it.maxVelocity)
+        telemetry?.addData("maxVelocity", it.maxVelocity)
+
+//        if (it.active) {
+//            motor.ePower = it.pid.compute(it.velocity, it.targetVelocity)
+//        } else {
+//            motor.ePower = 0.0
+//        }
+    }
+
     fun shoot() = SystemCommand.instant("Output Enable", state) {
-        motor.power = it.speed
+        motor.power = 0.9
         it.active = true
     }
 
@@ -55,8 +72,11 @@ class Output(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
         }
     }
     data class StateOutput(
+        var active: Boolean = false,
+        var velocity: Double = 0.0,
+        var targetVelocity: Double = 0.0,
         @Editable
-        var speed: Double = 0.9,
-        var active: Boolean = false
+        val pid: PID = PID(1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+        var maxVelocity: Double = 0.0
     ): BaseCommandState()
 }
