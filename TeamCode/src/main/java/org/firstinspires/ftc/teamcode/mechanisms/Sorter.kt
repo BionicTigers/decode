@@ -4,7 +4,9 @@ import com.qualcomm.robotcore.hardware.ColorSensor
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
+import com.qualcomm.robotcore.hardware.DigitalChannel
 import com.qualcomm.robotcore.hardware.HardwareMap
+import com.qualcomm.robotcore.hardware.configuration.typecontainers.DigitalIoDeviceConfigurationType
 import io.github.bionictigers.axiom.core.commands.BaseCommandState
 import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
@@ -20,6 +22,7 @@ import org.firstinspires.ftc.teamcode.control.GainSchedule
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
+import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.abs
 import kotlin.math.absoluteValue
@@ -51,6 +54,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     val motor = hardwareMap.getByName<DcMotorEx>("sorter")
     val hub = ControlHub(hardwareMap, "Control Hub")
     val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
+    val limitSwitch = hardwareMap.getByName<DigitalChannel>("limitSwitch")
 
     val state = SorterState(hub)
 
@@ -71,6 +75,11 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
         if (kicker?.state?.kickedThisCycle ?: false) {
             it.colors[(it.step + 2) % 3] = BallColor.None
+        }
+        if (limitSwitch.state) {
+            println("on")
+        } else {
+            println("off")
         }
     }
 
@@ -109,12 +118,17 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         telemetry?.addData("error", error)
 
         if (abs(error) > .5)
-            motor.power = -it.pid.compute(0.0, error)
+            motor.ePower = -it.pid.compute(0.0, error)
         else
-            motor.power = 0.0
+            motor.ePower = 0.0
 
-        if (kicker?.state?.reset ?: false)
-            motor.power -= .2
+        if (kicker?.state?.reset ?: false) {
+            if (!kicker.state.up)
+                motor.ePower -= .3
+            else
+                motor.ePower -= .175
+        }
+
 
         hub.setJunkTicks()
     }
@@ -237,13 +251,13 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         var ticks: Double = 0.0,
         val pid: DynamicPID = DynamicPID(GainSchedule(
             mapOf(
-                0.0 to 2.0,
+                0.0 to 8.0,
                 90.0 to 1.5,
-                180.0 to .75,
+                180.0 to .4, //2, 1.5, .75
             ),
             mapOf(0.0 to 0.0),
             mapOf(0.0 to 0.0)
-        ), 0.0, -180.0, 180.0, -.75, .75, 20.milliseconds, { abs(it) }),
+        ), 0.0, -180.0, 180.0, -.8, .8, 20.milliseconds, { abs(it) }),
         val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
     ) : BaseCommandState()
 }

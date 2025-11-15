@@ -29,6 +29,7 @@ open class BaseProfile {
         override val shoot = null
         override val stop = null
         override val toggle = Digital.Y.press()
+        override val toggleSlow = Digital.B.press()
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
@@ -37,7 +38,7 @@ open class BaseProfile {
         override val backward = Digital.LEFT_BUMPER.press()
         override val green = Digital.DPAD_LEFT.press()
         override val purple = Digital.DPAD_RIGHT.press()
-        override val openIntake = Digital.DPAD_DOWN.press()
+        override val openIntake = null
         override val openHuman = null
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
@@ -45,7 +46,8 @@ open class BaseProfile {
     val kicker = object : Kicker.Schema {
         override val kick : Digital = Digital.X.press()
         override val up : Digital = Digital.DPAD_UP.press()
-        override val desiredGamepad = Gamepads.GAMEPAD_2
+        override val down: Digital = Digital.DPAD_DOWN.press()
+        override val desiredGamepad = Gamepads.BOTH
     }
 
     companion object {

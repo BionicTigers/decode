@@ -33,11 +33,12 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
     interface Schema : ControlSchema {
         val kick: Digital?
         val up: Digital?
+        val down: Digital?
     }
 
     override val beforeRun = SystemCommand.continuous("Kicker Update", state) {
         it.kickedThisCycle = false
-        if (it.lastKickedAt.elapsedNow() > 250.milliseconds && it.reset) {
+        if (it.lastKickedAt.elapsedNow() > it.time && it.reset) {
             servo.position = it.defaultPosition
             it.reset = false
         }
@@ -50,11 +51,20 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
         it.lastKickedAt = TimeSource.Monotonic.markNow()
         it.reset = true
         it.kickedThisCycle = true
+        it.up = false
+        it.time = 250.milliseconds
     }
 
     fun up() = SystemCommand.instant("Up", state) {
         servo.position = it.upPosition
         it.reset = false
+        it.up = true
+    }
+
+    fun down() = SystemCommand.instant("Down", state) {
+        servo.position = it.defaultPosition
+        it.reset = true
+        it.up = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -63,6 +73,7 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
 
             kick?.let { builder.register(it) { kick() } }
             up?.let { builder.register(it) { up() } }
+            down?.let {builder.register(it) { down() } }
         }
     }
     data class KickerState(
@@ -72,8 +83,10 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
         @Editable
         var kickPosition: Double = .95,
         @Editable
-        var upPosition: Double = 0.0,
+        var upPosition: Double = 0.1,
         var reset: Boolean = false,
-        var kickedThisCycle: Boolean = false
+        var kickedThisCycle: Boolean = false,
+        var up: Boolean = false,
+        var time: Duration = 250.milliseconds
     ) : BaseCommandState()
 }

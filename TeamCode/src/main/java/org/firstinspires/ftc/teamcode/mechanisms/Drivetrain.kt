@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.mechanisms
 
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.BaseCommandState
 import io.github.bionictigers.axiom.core.commands.Command
@@ -14,6 +15,7 @@ import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.web.Server
+import io.github.bionictigers.axiom.core.web.Server.start
 import io.github.bionictigers.axiom.core.web.WebData
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
@@ -21,8 +23,10 @@ import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
+import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.Matrix
 import org.firstinspires.ftc.teamcode.utils.Pose
+import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.compareTo
 import kotlin.math.PI
@@ -30,6 +34,7 @@ import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.sign
@@ -59,15 +64,26 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     override val name = "Drivetrain"
 
     companion object {
+//        val xJerk = 60//00.0
+//        val yJerk = 30//00.0
+//        val angularJerk = Angle.degrees(50.0)//ngle.degrees(150.0)//Angle.degrees(900.0)
+//        val xMaxAcceleration = 35//09.0
+//        val yMaxAcceleration = 35//69.0/4.0
+//        val angularMaxAcceleration = Angle.degrees(90.0) //900 //130
+//        val xMaxVelocity = 10//03.0
+//        val yMaxVelocity = 18//12.0
+//        val angularMaxVelocity = Angle.degrees(30.0)//390
+//
         val xJerk = 6000.0
         val yJerk = 3000.0
-        val angularJerk = Angle.degrees(900.0)
+        val angularJerk = Angle.degrees(9000.0)//Angle.degrees(900.0)
         val xMaxAcceleration = 3509.0
         val yMaxAcceleration = 3569.0/4.0
-        val angularMaxAcceleration = Angle.degrees(900.0) //130
+        val angularMaxAcceleration = Angle.degrees(900.0) //900 //130
         val xMaxVelocity = 1003.0
         val yMaxVelocity = 1812.0
-        val angularMaxVelocity = Angle.degrees(310.0)
+        val angularMaxVelocity = Angle.degrees(390.0)//390
+
 
         val xProfile = MotionProfile(xJerk, xMaxAcceleration, xMaxVelocity)
         val yProfile = MotionProfile(yJerk, yMaxAcceleration, yMaxVelocity)
@@ -75,10 +91,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
         val K: Matrix = Matrix(
             arrayOf(
-            arrayOf(0.15638948, 0.15638948, -0.05931547, 0.10198206, 0.10198206, 0.00310677),
-            arrayOf(-0.15638948, 0.15638948, 0.05931547, -0.10198206, 0.10198206, -0.00310677),
-            arrayOf(-0.15638948, 0.15638948, -0.05931547, -0.10198206, 0.10198206, 0.00310677),
-            arrayOf(0.15638948, 0.15638948, 0.05931547, 0.10198206, 0.10198206, -0.00310677)
+                arrayOf(0.011174535377565482, 0.011174535377562932, -0.045738378172064, 0.00982304939088537, 0.009823049390882863, -0.010866834518862686),
+                arrayOf(-0.0111745353775661, 0.011174535377564292, 0.04573837817206454, -0.009823049390885843, 0.009823049390884474, 0.010866834518862698),
+                arrayOf(-0.011174535377569088, 0.01117453537756327, -0.045738378172065046, -0.00982304939088793, 0.009823049390883335, -0.010866834518862717),
+                arrayOf(0.011174535377568462, 0.011174535377563957, 0.04573837817206561, 0.009823049390887451, 0.009823049390884004, 0.010866834518862736),
             )
         )
 
@@ -98,7 +114,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    private val motors = DriveMotors(hardwareMap)
+    val motors = DriveMotors(hardwareMap)
 
     val data = DrivetrainData()
 
@@ -107,6 +123,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
             it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         }
+//        motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
+//        motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
+//        motors.backRight.direction = DcMotorSimple.Direction.REVERSE
+
 
 //        Server.OnDrivetrainUpdate = { x, y, r ->
 //            println("$x, $y, $r")
@@ -121,15 +141,38 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     private var timeLetGo = TimeSource.Monotonic.markNow()
     private var rotation = 0.0
 
-    override val beforeRun = SystemCommand.continuous("Motor Power Calculation", data) {
-        if (it.isInTeleop) {
-//            if (odometry != null) {
-                if (it.rotControl.absoluteValue > .05) {
-                    rotation = it.rotControl
-                    timeLetGo = TimeSource.Monotonic.markNow()
-//                    targetHeading = odometry.position.radians % (2 * PI)
-                } else {
-                    rotation = 0.0
+    override val beforeRun = SystemCommand.create("Motor Power Calculation", data) {
+        enter {
+            if (it.isInTeleop) {
+//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE //these are for test bot
+//                motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
+//                motors.backLeft.direction = DcMotorSimple.Direction.FORWARD
+//                motors.backRight.direction = DcMotorSimple.Direction.REVERSE
+            } else {
+//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
+//                motors.frontRight.direction = DcMotorSimple.Direction.FORWARD
+//                motors.backLeft.direction = DcMotorSimple.Direction.REVERSE
+//                motors.backRight.direction = DcMotorSimple.Direction.FORWARD
+//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
+//                motors.frontRight.direction = DcMotorSimple.Direction.FORWARD
+//                motors.backLeft.direction = DcMotorSimple.Direction.FORWARD
+//                motors.backRight.direction = DcMotorSimple.Direction.FORWARD
+                motors.frontLeft.direction = DcMotorSimple.Direction.FORWARD
+                motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
+                motors.backLeft.direction = DcMotorSimple.Direction.REVERSE
+                motors.backRight.direction = DcMotorSimple.Direction.REVERSE
+            }
+        }
+
+        action {
+            if (it.isInTeleop) {
+                if (odometry != null) {
+                    if (it.rotControl.absoluteValue > .05) {
+                        rotation = it.rotControl
+                        timeLetGo = TimeSource.Monotonic.markNow()
+                        targetHeading = odometry.position.radians % (2 * PI)
+                    } else {
+                        rotation = 0.0
 //                } else {
 //                    val shortestPath = atan2(
 //                        sin(odometry.position.radians - targetHeading),
@@ -138,21 +181,49 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 //                    rotation = headingPID.compute(0.0, shortestPath) / PI
 //                    println(rotation)
 //                }
+                    }
                 }
             }
-//        }
+        }
     }
 
     var errorState: Matrix? = null
 
+    fun Double.toHundredths(): Double {
+        return floor(this * 100) / 100
+    }
+
+    fun List<Double>.printSimple(): String {
+        var string = ""
+        this.forEach {
+            string += it.toHundredths().toString() + ", "
+        }
+        return string
+    }
+
+    operator fun List<Double>.times(num: Double): List<Double> {
+        val result = mutableListOf<Double>()
+        this.forEach {
+            result.add(it * num)
+        }
+        return result
+    }
+
     override val afterRun = SystemCommand.continuous("Drivetrain Update", data) {
         if (it.isInTeleop) {
             val powers = calculatePowers(-it.xControl, -it.yControl, rotation)
+            telemetry?.addData("Powers", powers.printSimple())
             motors.setPower(powers)
+
+            println(odometry!!.position.degrees.toString())
+            println(odometry.position.x.toString())
+//            println(odometry.position.degrees.toString() + ", " + odometry.position.y.toString())
         } else {
             if (errorState != null) {
-                val controlMatrix = -K * errorState!!
-                motors.setPower(controlMatrix)
+                val controlMatrix = (-K * errorState!!)
+                telemetry?.addData("Error", errorState!!.printSimple())
+                telemetry?.addData("Control Matrix", controlMatrix.printSimple())
+                motors.setPower(controlMatrix.scalar(.4))
             } else {
                 stop()
             }
@@ -167,7 +238,8 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             val currentPose = odometry!!.position
             xResult = xProfile.generate(currentPose.x, targetPose.x)
             yResult = yProfile.generate(currentPose.y, targetPose.y)
-            angularResult = angularProfile.generate(currentPose.radians, targetPose.radians)
+            // TODO: Denormalize target angle before generating profile
+            angularResult = angularProfile.generate(currentPose.degrees, targetPose.degrees)
         }
 
         action {
@@ -177,22 +249,24 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
             val x = currentPose.x - (xResult?.getPosition(time) ?: 0.0)
             val y = currentPose.y - (yResult?.getPosition(time) ?: 0.0)
-            val rot = currentPose.radians - (angularResult?.getPosition(time) ?: 0.0)
+            val rot = currentPose.degrees - (angularResult?.getPosition(time) ?: 0.0)
             val vx = currentVelocity.x - (xResult?.getVelocity(time) ?: 0.0)
             val vy = currentVelocity.y - (yResult?.getVelocity(time) ?: 0.0)
-            val w = currentVelocity.radians - (angularResult?.getVelocity(time) ?: 0.0)
+            val w = currentVelocity.degrees - (angularResult?.getVelocity(time) ?: 0.0)
 
             errorState = Matrix(
                 arrayOf(
-                    arrayOf(x, y, rot, vx, vy, w)
+                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(vx), arrayOf(vy), arrayOf(w)
                 )
             )
 
-            if (currentPose.within(targetPose, Pose(10,10,5))) {
+            if (currentPose.within(targetPose, Pose(1,1,5))) {
                 stop()
             }
 
-            telemetry?.addData("Target Pose", targetPose)
+//            telemetry?.addData("Current Pose", currentPose)
+//            telemetry?.addData("Target Pose", targetPose)
+//            telemetry?.addData("Error State", errorState)
         }
 
         exit {
@@ -207,18 +281,18 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
             val x = error.x
             val y = error.y
-            val rot = error.radians
+            val rot = error.degrees
             val vx = 0.0
             val vy = 0.0
             val w = 0.0
 
             errorState = Matrix(
                 arrayOf(
-                    arrayOf(x, y, rot, vx, vy, w)
+                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(vx), arrayOf(vy), arrayOf(w)
                 )
             )
 
-            if (currentPose.within(targetPose, Pose(10, 10, 5))) {
+            if (currentPose.within(targetPose, Pose(1, 1, 5))) {
                 stop()
             }
         }
@@ -264,7 +338,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             builder.register(rot) { setRotControl(abs(it).pow(1.5) * sign(it)) }
         }
 
-    private data class DriveMotors(
+    data class DriveMotors(
         val frontLeft: DcMotorEx,
         val frontRight: DcMotorEx,
         val backLeft: DcMotorEx,
@@ -280,12 +354,17 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         fun setPower(frontLeft: Double, backLeft: Double, frontRight: Double, backRight: Double) {
             val ratio = maxOf(abs(frontLeft), abs(backLeft), abs(frontRight), abs(backRight), 1.0)
 
-            if (frontLeft != this.frontLeft.power) this.frontLeft.power = frontLeft / ratio
-            if (backLeft != this.backLeft.power) this.backLeft.power = backLeft / ratio
-            if (frontRight != this.frontRight.power) this.frontRight.power = frontRight / ratio
-            if (backRight != this.backRight.power) this.backRight.power = backRight / ratio
+            if (frontLeft != this.frontLeft.power) this.frontLeft.ePower = frontLeft / ratio
+            if (backLeft != this.backLeft.power) this.backLeft.ePower = backLeft / ratio
+            if (frontRight != this.frontRight.power) this.frontRight.ePower = frontRight / ratio
+            if (backRight != this.backRight.power) this.backRight.ePower = backRight / ratio
 
             WebData.setDrivetrain(frontLeft, -frontRight, backLeft, -backRight)
+        }
+
+        fun setPower(power: Double) {
+            setPower(power, power, power, power)
+
         }
 
         fun setPower(powers: List<Double>) {
@@ -293,7 +372,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
 
         fun setPower(matrix: Matrix) {
-            setPower(matrix[0, 0], matrix[0, 1], matrix[0, 2], matrix[0, 3])
+            setPower(matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0])
         }
 
         override operator fun iterator() = listOf(frontLeft, frontRight, backLeft, backRight).iterator()

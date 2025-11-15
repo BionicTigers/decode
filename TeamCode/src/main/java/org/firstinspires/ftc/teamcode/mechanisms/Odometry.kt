@@ -7,10 +7,12 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit
 import org.firstinspires.ftc.teamcode.drivers.GoBildaPinpointDriver
+import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Matrix
 import org.firstinspires.ftc.teamcode.utils.getByName
+import org.firstinspires.ftc.teamcode.utils.interpolatedMapOf
 
 interface RobotConfig {
     /**
@@ -28,20 +30,20 @@ interface RobotConfig {
 
 object Configs {
     object Test: RobotConfig {
-        override val forwardOffset: Distance = Distance.mm(0.0) // TODO: Set actual value
-        override val strafeOffset: Distance = Distance.mm(0.0) // TODO: Set actual value
+        override val forwardOffset: Distance = Distance.inch((6.9))
+        override val strafeOffset: Distance = Distance.inch((-3.75))
     }
 
     object Main: RobotConfig {
-        override val forwardOffset: Distance = Distance.mm(175.0) // TODO: Set actual value
-        override val strafeOffset: Distance = Distance.mm(90.0) // TODO: Set actual value
+        override val forwardOffset: Distance = Distance.inch(5.75)
+        override val strafeOffset: Distance = Distance.inch(0.0)
     }
 }
 
 class Odometry(
     hardwareMap: HardwareMap,
     telemetry: Telemetry?,
-    startPose: Pose = Pose(0.0, 0.0, 0.0),
+    startPose: Pose = Pose(0.0, 0.0, Angle.radians(0.0)),
     private val config: RobotConfig = Configs.Main,
     override val name: String = "Odometry"
 ): System() {
@@ -62,9 +64,9 @@ class Odometry(
 
     init {
         pinpoint.setOffsets(config.forwardOffset.mm, config.strafeOffset.mm, DistanceUnit.MM)
-        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD)
+        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
         pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED)
-//        pinpoint.recalibrateIMU()
+            pinpoint.recalibrateIMU()
         pinpoint.setPosition(startPose.toPose2D())
     }
 
@@ -79,17 +81,27 @@ class Odometry(
     override val beforeRun = SystemCommand.continuous("Odometry Update") {
         pinpoint.update()
 
+
         position = Pose(
+            -pinpoint.getPosY(DistanceUnit.MM),
             pinpoint.getPosX(DistanceUnit.MM),
-            pinpoint.getPosY(DistanceUnit.MM),
-            pinpoint.getHeading(AngleUnit.RADIANS)
+            0.0//-Angle.radians(pinpoint.getHeading(UnnormalizedAngleUnit.RADIANS))
         )
 
         velocity = Pose(
+            -pinpoint.getVelY(DistanceUnit.MM),
             pinpoint.getVelX(DistanceUnit.MM),
-            pinpoint.getVelY(DistanceUnit.MM),
-            pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS)
+            0.0//-Angle.radians(pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS))
         )
+
+        telemetry?.addData("x", position.x)
+        telemetry?.addData("y", position.y)
+        telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
+        telemetry?.addData("x vel", velocity.x)
+        telemetry?.addData("y vel", velocity.y)
+        telemetry?.addData("rot vel", velocity.rotation.degrees.normalizeDegrees())
+
+
     }
 
     private var loopTimeTooLowWarning: Telemetry.Line? = null
@@ -114,4 +126,12 @@ class Odometry(
                     loopTimeTooHighWarning = null
                 }
     }
+}
+
+fun Double.normalizeDegrees() : Double {
+    var angle = this % 360
+    if (angle < 0) {
+        angle += 360.0
+    }
+    return angle
 }

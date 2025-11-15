@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import io.github.bionictigers.axiom.core.commands.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.motion.Odometry
+import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.Pose
 
 @Autonomous(name = "LQR Test", group = "autonomous")
@@ -12,13 +13,16 @@ class LQRTest : LinearOpMode() {
     override fun runOpMode() {
         val odometry = Odometry(hardwareMap, telemetry)
         val drivetrain = Drivetrain(hardwareMap, telemetry, odometry)
-        val pose = Pose(200.0, 200.0, 0.0)
+        val pose = Pose(0.0, 500.0, 0.0)
+        Scheduler.schedule(drivetrain, odometry)
 
         waitForStart()
-        Scheduler.schedule(drivetrain.moveToPosition(pose))
+        Scheduler.schedule(drivetrain.mtpNoProfile(pose))
         while (opModeIsActive()) {
             Scheduler.update()
             telemetry.update()
         }
+
+        Scheduler.reset()
     }
 }
