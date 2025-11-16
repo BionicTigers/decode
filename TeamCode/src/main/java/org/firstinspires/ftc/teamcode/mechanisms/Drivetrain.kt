@@ -24,7 +24,6 @@ import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.ControlHub
-import org.firstinspires.ftc.teamcode.utils.Matrix
 import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
@@ -78,25 +77,16 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         val yJerk = 3000.0
         val angularJerk = Angle.degrees(9000.0)//Angle.degrees(900.0)
         val xMaxAcceleration = 3509.0
-        val yMaxAcceleration = 3569.0/4.0
+        val yMaxAcceleration = 3569.0
         val angularMaxAcceleration = Angle.degrees(900.0) //900 //130
         val xMaxVelocity = 1003.0
         val yMaxVelocity = 1812.0
-        val angularMaxVelocity = Angle.degrees(390.0)//390
+        val angularMaxVelocity = Angle.degrees(390.0)
 
 
         val xProfile = MotionProfile(xJerk, xMaxAcceleration, xMaxVelocity)
         val yProfile = MotionProfile(yJerk, yMaxAcceleration, yMaxVelocity)
         val angularProfile = MotionProfile(angularJerk.radians, angularMaxAcceleration.radians, angularMaxVelocity.radians)
-
-        val K: Matrix = Matrix(
-            arrayOf(
-                arrayOf(0.011174535377565482, 0.011174535377562932, -0.045738378172064, 0.00982304939088537, 0.009823049390882863, -0.010866834518862686),
-                arrayOf(-0.0111745353775661, 0.011174535377564292, 0.04573837817206454, -0.009823049390885843, 0.009823049390884474, 0.010866834518862698),
-                arrayOf(-0.011174535377569088, 0.01117453537756327, -0.045738378172065046, -0.00982304939088793, 0.009823049390883335, -0.010866834518862717),
-                arrayOf(0.011174535377568462, 0.011174535377563957, 0.04573837817206561, 0.009823049390887451, 0.009823049390884004, 0.010866834518862736),
-            )
-        )
 
         fun calculatePowers(x: Double, y: Double, rot: Double): List<Double> {
 //            val direction = atan2(y, x)
@@ -140,6 +130,19 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     private var targetHeading = 0.0
     private var timeLetGo = TimeSource.Monotonic.markNow()
     private var rotation = 0.0
+    
+    // PID controllers for autonomous movement
+    private val xPID = PID(6.0, 0.0, 0, 0.0, -1000.0, 4000.0, -1.0, 1.0)
+    private val yPID = PID(6.0, 0.0, 0, 0.0, -1000.0, 4000.0, -1.0, 1.0)
+    private val rotPID = PID(12.0, 0.0, 0, 0.0, -360.0, 360.0, -1.0, 1.0)
+    
+    // Feedforward gains (kV for velocity feedforward, kA for acceleration feedforward)
+    private val xkV = 0.001 // Velocity feedforward gain for x
+    private val xkA = 0.0001 // Acceleration feedforward gain for x
+    private val ykV = 0.001 // Velocity feedforward gain for y
+    private val ykA = 0.0001 // Acceleration feedforward gain for y
+    private val rotkV = 0.001 // Velocity feedforward gain for rotation
+    private val rotkA = 0.0001 // Acceleration feedforward gain for rotation
 
     override val beforeRun = SystemCommand.create("Motor Power Calculation", data) {
         enter {
@@ -187,7 +190,14 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    var errorState: Matrix? = null
+    // Motion profile results for current movement
+    private var xProfileResult: MotionProfile.MotionResult? = null
+    private var yProfileResult: MotionProfile.MotionResult? = null
+    private var angularProfileResult: MotionProfile.MotionResult? = null
+    private var profileStartTime: TimeMark? = null
+    
+    // Simple target pose for PID-only control (no motion profile)
+    private var simpleTargetPose: Pose? = null
 
     fun Double.toHundredths(): Double {
         return floor(this * 100) / 100
@@ -201,29 +211,103 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         return string
     }
 
-    operator fun List<Double>.times(num: Double): List<Double> {
-        val result = mutableListOf<Double>()
-        this.forEach {
-            result.add(it * num)
-        }
-        return result
-    }
-
     override val afterRun = SystemCommand.continuous("Drivetrain Update", data) {
         if (it.isInTeleop) {
             val powers = calculatePowers(-it.xControl, -it.yControl, rotation)
             telemetry?.addData("Powers", powers.printSimple())
             motors.setPower(powers)
 
-            println(odometry!!.position.degrees.toString())
-            println(odometry.position.x.toString())
+//            println(odometry!!.position.degrees.toString())
+//            println(odometry.position.x.toString())
 //            println(odometry.position.degrees.toString() + ", " + odometry.position.y.toString())
         } else {
-            if (errorState != null) {
-                val controlMatrix = (-K * errorState!!)
-                telemetry?.addData("Error", errorState!!.printSimple())
-                telemetry?.addData("Control Matrix", controlMatrix.printSimple())
-                motors.setPower(controlMatrix.scalar(.4))
+            // Autonomous mode - PID + feedforward control
+            val currentPose = odometry!!.position
+            
+            if (xProfileResult != null && yProfileResult != null && angularProfileResult != null && profileStartTime != null) {
+                // Motion profile mode - PID + feedforward with motion profiles
+                val currentVelocity = odometry.velocity
+                val elapsedTime = profileStartTime!!.elapsedNow()
+                
+                // Get target position, velocity, and acceleration from motion profiles
+                val targetX = xProfileResult!!.getPosition(elapsedTime)
+                val targetY = yProfileResult!!.getPosition(elapsedTime)
+                val targetRot = angularProfileResult!!.getPosition(elapsedTime)
+                
+                val targetVx = xProfileResult!!.getVelocity(elapsedTime)
+                val targetVy = yProfileResult!!.getVelocity(elapsedTime)
+                val targetVRot = angularProfileResult!!.getVelocity(elapsedTime)
+                
+                val targetAx = xProfileResult!!.getAcceleration(elapsedTime)
+                val targetAy = yProfileResult!!.getAcceleration(elapsedTime)
+                val targetARot = angularProfileResult!!.getAcceleration(elapsedTime)
+                
+                // Calculate errors
+                val xError = currentPose.x - targetX
+                val yError = currentPose.y - targetY
+                // Calculate shortest angular error (handles wrap-around)
+                val rotError = -Math.toDegrees(
+                    atan2(
+                        sin(Math.toRadians(targetRot - currentPose.degrees)),
+                        cos(Math.toRadians(targetRot - currentPose.degrees))
+                    )
+                )
+                
+                // PID control outputs
+                val xPIDOutput = xPID.compute(currentPose.x, targetX)
+                val yPIDOutput = yPID.compute(currentPose.y, targetY)
+                val rotPIDOutput = rotPID.compute(0.0, rotError)
+                
+                // Feedforward terms (velocity and acceleration feedforward)
+                val xFF = xkV * targetVx + xkA * targetAx
+                val yFF = ykV * targetVy + ykA * targetAy
+                val rotFF = rotkV * targetVRot + rotkA * targetARot
+                
+                // Combined PID + feedforward
+                val xControl = xPIDOutput + xFF
+                val yControl = yPIDOutput + yFF
+                val rotControl = rotPIDOutput + rotFF
+                
+                // Convert to motor powers
+                val powers = calculatePowers(xControl, yControl, rotControl)
+                
+                telemetry?.addData("X Error", xError)
+                telemetry?.addData("Y Error", yError)
+                telemetry?.addData("Rot Error", rotError)
+                telemetry?.addData("X PID", xPIDOutput)
+                telemetry?.addData("Y PID", yPIDOutput)
+                telemetry?.addData("Rot PID", rotPIDOutput)
+                telemetry?.addData("X FF", xFF)
+                telemetry?.addData("Y FF", yFF)
+                telemetry?.addData("Rot FF", rotFF)
+                
+                motors.setPower(powers)
+            } else if (simpleTargetPose != null) {
+                // Simple PID-only mode (no motion profile, no feedforward)
+                val target = simpleTargetPose!!
+                
+                // Calculate shortest angular error (handles wrap-around)
+                val rotError = -Math.toDegrees(
+                    atan2(
+                        sin(Math.toRadians(target.degrees - currentPose.degrees)),
+                        cos(Math.toRadians(target.degrees - currentPose.degrees))
+                    )
+                )
+                
+                // PID control outputs only
+                val xControl = xPID.compute(currentPose.x, target.x)
+                val yControl = yPID.compute(currentPose.y, target.y)
+                val rotControl = rotPID.compute(rotError, 0.0)
+                
+                // Convert to motor powers
+                val powers = calculatePowers(xControl, yControl, rotControl)
+                
+                telemetry?.addData("X Error", xControl)
+                telemetry?.addData("Y Error", yControl)
+                telemetry?.addData("Rot Error", rotControl)
+                telemetry?.addData("Powers", powers.printSimple())
+
+                motors.setPower(powers)
             } else {
                 stop()
             }
@@ -231,87 +315,73 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     }
 
     fun moveToPosition(targetPose: Pose) = Command.create("Move to Position") {
-        var xResult: MotionProfile.MotionResult? = null
-        var yResult: MotionProfile.MotionResult? = null
-        var angularResult: MotionProfile.MotionResult? = null
         enter {
             val currentPose = odometry!!.position
-            xResult = xProfile.generate(currentPose.x, targetPose.x)
-            yResult = yProfile.generate(currentPose.y, targetPose.y)
-            // TODO: Denormalize target angle before generating profile
-            angularResult = angularProfile.generate(currentPose.degrees, targetPose.degrees)
-        }
-
-        action {
-            val currentPose = odometry!!.position
             val currentVelocity = odometry.velocity
-            val time = it.enteredAt?.elapsedNow() ?: Duration.ZERO
-
-            val x = currentPose.x - (xResult?.getPosition(time) ?: 0.0)
-            val y = currentPose.y - (yResult?.getPosition(time) ?: 0.0)
-            val rot = currentPose.degrees - (angularResult?.getPosition(time) ?: 0.0)
-            val vx = currentVelocity.x - (xResult?.getVelocity(time) ?: 0.0)
-            val vy = currentVelocity.y - (yResult?.getVelocity(time) ?: 0.0)
-            val w = currentVelocity.degrees - (angularResult?.getVelocity(time) ?: 0.0)
-
-            errorState = Matrix(
-                arrayOf(
-                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(vx), arrayOf(vy), arrayOf(w)
-                )
-            )
-
-            if (currentPose.within(targetPose, Pose(1,1,5))) {
-                stop()
-            }
-
-//            telemetry?.addData("Current Pose", currentPose)
-//            telemetry?.addData("Target Pose", targetPose)
-//            telemetry?.addData("Error State", errorState)
+            
+            // Generate motion profiles with current velocity as starting velocity
+            xProfileResult = xProfile.generate(currentPose.x, targetPose.x, currentVelocity.x)
+            yProfileResult = yProfile.generate(currentPose.y, targetPose.y, currentVelocity.y)
+            angularProfileResult = angularProfile.generate(currentPose.degrees, targetPose.degrees, currentVelocity.degrees)
+            
+            profileStartTime = TimeSource.Monotonic.markNow()
+            
+            // Reset PID controllers
+            xPID.reset()
+            yPID.reset()
+            rotPID.reset()
         }
 
-        exit {
-            errorState = null
-        }
-    }
-
-    fun mtpNoProfile(targetPose: Pose) = Command.create("Move to Position") {
         action {
             val currentPose = odometry!!.position
-            val error = currentPose - targetPose
-
-            val x = error.x
-            val y = error.y
-            val rot = error.degrees
-            val vx = 0.0
-            val vy = 0.0
-            val w = 0.0
-
-            errorState = Matrix(
-                arrayOf(
-                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(vx), arrayOf(vy), arrayOf(w)
-                )
-            )
-
+            
+            // Check if we've reached the target
             if (currentPose.within(targetPose, Pose(1, 1, 5))) {
                 stop()
             }
         }
 
         exit {
-            errorState = null
+            xProfileResult = null
+            yProfileResult = null
+            angularProfileResult = null
+            profileStartTime = null
         }
     }
 
-    fun calculatePowers(x: Double, y: Double, rotation: Double): List<Double> {
-        val frontLeft = y - x + rotation
-        val frontRight = y + x - rotation
-        val backLeft = y + x + rotation
-        val backRight = y - x - rotation
+    fun mtpNoProfile(targetPose: Pose) = Command.create("Move to Position No Profile") {
+        enter {
+            // Set simple target pose for PID-only control
+            simpleTargetPose = targetPose
+            
+            // Reset PID controllers
+            xPID.reset()
+            yPID.reset()
+            rotPID.reset()
+        }
+        
+        action {
+            val currentPose = odometry!!.position
+            
+            // Check if we've reached the target
+            if (currentPose.within(targetPose, Pose(1, 1, 5))) {
+                stop()
+            }
+        }
 
-        val powers = listOf(-frontLeft, backLeft, frontRight, backRight)
-
-        return powers.map { it }
+        exit {
+            simpleTargetPose = null
+        }
     }
+
+    // fun calculatePowers(x: Double, y: Double, rotation: Double): List<Double> {
+    //     val fL = y - x + rotation
+    //     val fR = y + x - rotation
+    //     val bL = y + x + rotation
+    //     val bR = y - x - rotation
+
+    //     return listOf(-fL, -bL, fR, bR)
+    // }
 
     fun stop() = motors.setPower(0.0, 0.0, 0.0, 0.0)
 
@@ -371,9 +441,6 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             setPower(powers[0], powers[1], powers[2], powers[3])
         }
 
-        fun setPower(matrix: Matrix) {
-            setPower(matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0])
-        }
 
         override operator fun iterator() = listOf(frontLeft, frontRight, backLeft, backRight).iterator()
     }
