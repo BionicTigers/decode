@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode.mechanisms
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
-import io.github.bionictigers.axiom.core.commands.BaseCommandState
-import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -27,26 +25,27 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
 
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
 
+    var active: Boolean = false
+    var stillSpeed: Double = .7
+
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
     }
 
-    var state = StateIntake()
-
-    override val afterRun = SystemCommand.continuous("Intake After Run", state) {
-        if (it.active) {
-            val power = state.stillSpeed + (drivetrain?.data?.yControl ?: 1.0) * (1.0 - state.stillSpeed)
+    override val apply = SystemCommand.continuous("Intake After Run") {
+        if (active) {
+            val power = stillSpeed + (drivetrain?.yControl ?: 1.0) * (1.0 - stillSpeed)
             if (motor.power != power) motor.power = power
         }
     }
 
-    fun intake() = SystemCommand.instant("Intake Enable", state) {
-        it.active = true
+    fun intake() = SystemCommand.instant("Intake Enable") {
+        active = true
     }
 
-    fun stop() = SystemCommand.instant("Intake Disable", state) {
+    fun stop() = SystemCommand.instant("Intake Disable") {
         motor.power = 0.0
-        it.active = false
+        active = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -55,12 +54,7 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
 
             intake?.let { builder.register(it) { intake() } }
             stop?.let { builder.register(it) { stop() } }
-            toggle?.let { builder.register(it) { if (state.active) stop() else intake() } }
+            toggle?.let { builder.register(it) { if (active) stop() else intake() } }
         }
     }
-
-    data class StateIntake(
-        var active: Boolean = false,
-        var stillSpeed: Double = .7
-    ): BaseCommandState()
 }

@@ -37,7 +37,7 @@ open class PID(
 
     @Display(priority = 9) var processValue: Double = 0.0
         private set(value) { field = value.coerceIn(pvMin, pvMax) }
-    @Display(priority = 8) var setpoint: Double = 0.0
+    @Display(priority = 8) var setPoint: Double = 0.0
         private set(value) { field = value.coerceIn(pvMin, pvMax) }
 
     @Display(priority = 7) var cv: Double = 0.0
@@ -58,25 +58,25 @@ open class PID(
 
     private val span get() = pvMax - pvMin
 
-    open fun compute(processValue: Double, setpoint: Double): Double {
+    open fun compute(processValue: Double, setPoint: Double): Double {
         val dt = lastCompute?.elapsedNow() ?: sampleTime
         if (dt < sampleTime) return cv
 
         val dts = dt.toDouble(DurationUnit.SECONDS)
 
-        error = setpoint - processValue
+        error = setPoint - processValue
         errorPercent = if (pvMax - pvMin == 0.0) 0.0 else error / span
 
         p = kP * errorPercent
         d = kD * -(processValue - this.processValue) / span / dts
 
-        val cvRaw = p + i + d + feedforward(setpoint, (setpoint - this.setpoint) / dts)
+        val cvRaw = p + i + d + feedforward(setPoint, (setPoint - this.setPoint) / dts)
         cv = cvRaw.coerceIn(cvMin, cvMax)
 
         i += (kI * errorPercent + kAW * (cv - cvRaw)) * dts
 
         this.processValue = processValue
-        this.setpoint = setpoint
+        this.setPoint = setPoint
 
         lastCompute = TimeSource.Monotonic.markNow()
         return cv

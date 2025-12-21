@@ -5,7 +5,6 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.Servo
-import io.github.bionictigers.axiom.core.commands.BaseCommandState
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -18,15 +17,22 @@ import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
-import org.firstinspires.ftc.teamcode.utils.NewRollingAverage
+import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.eq
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
+
+    var active: Boolean = false
+    var velocity: RollingAverage = RollingAverage(5)
+    var targetVelocity: Double = 0.0
+    @Editable
+    val pid: PID = PID(100.0, 2.0, 0.0, 1.0, 0.0, 1980.0, 0.0, 1.0)
+    var maxVelocity: Double = 0.0
 
     interface Schema : ControlSchema {
         val shoot: Digital?
@@ -46,33 +52,37 @@ class Output(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
         hub.setJunkTicks()
     }
     companion object {
-        var farTarget = 1880.0
-        var closeTarget = 1680.0
+        var farTarget = 1980.0
+        var closeTarget = 1720.0
     }
 
-    var state = StateOutput()
-
-    override val beforeRun = SystemCommand.continuous("Output Data", state) {
+    override val update = SystemCommand.continuous("Output Data") {
         hub.refreshBulkData()
         val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
         if (lVel.isFinite()) {
-            it.velocity.plusAssign(lVel)
+            velocity.plusAssign(lVel)
         }
-        it.maxVelocity = max(it.velocity.average, it.maxVelocity)
-        telemetry?.addData("maxVelocity", it.maxVelocity)
-        telemetry?.addData("target", it.targetVelocity)
-        telemetry?.addData("velocity", it.velocity.average)
+        maxVelocity = max(velocity.average, maxVelocity)
+        telemetry?.addData("maxVelocity", maxVelocity)
+        telemetry?.addData("target", targetVelocity)
+        telemetry?.addData("velocity", velocity.average)
         telemetry?.addData("power", motor.ePower)
 
-        if (it.active) {
-            motor.ePower = it.pid.compute(it.velocity.average, it.targetVelocity) + .05
+        if (active) {
+            if (kicker?.reset ?: false)
+                motor.ePower = 1.0
+            else {
+                val error = targetVelocity - velocity.average
+                val rampPower = if (error > 100) 1.0 else 0.0
+                motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+            }
         } else {
             motor.ePower = 0.0
         }
 
-        if (it.active && it.velocity.average.eq(it.targetVelocity, 45.0))
+        if (active && velocity.average.eq(targetVelocity, 45.0))
             indcLight.position = .5
-        else if (it.active)
+        else if (active)
             indcLight.position = .28
         else
             indcLight.position = .63
@@ -81,22 +91,22 @@ class Output(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
         hub.setJunkTicks()
     }
 
-    fun shoot() = SystemCommand.instant("Output Enable", state) {
+    fun shoot() = SystemCommand.instant("Output Enable") {
 //        motor.power = .83
-        it.targetVelocity = farTarget
-        it.active = true
+        targetVelocity = farTarget
+        active = true
     }
 
-    fun shootClose() = SystemCommand.instant("Output Enable Slow", state) {
+    fun shootClose() = SystemCommand.instant("Output Enable Slow") {
 //        motor.power = .73
-        it.targetVelocity = closeTarget
-        it.active = true
+        targetVelocity = closeTarget
+        active = true
     }
 
-    fun stop() = SystemCommand.instant("Output Disable", state) {
+    fun stop() = SystemCommand.instant("Output Disable") {
 //        motor.power = 0.0
-        it.targetVelocity = 0.0
-        it.active = false
+        targetVelocity = 0.0
+        active = false
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -105,16 +115,8 @@ class Output(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
 
             shoot?.let { builder.register(it) { shoot() } }
             stop?.let { builder.register(it) { stop() } }
-            toggle?.let { builder.register(it) { if (state.active && state.targetVelocity == farTarget) stop() else shoot() } }
-            toggleSlow?.let { builder.register(it) { if (state.active && state.targetVelocity == closeTarget) stop() else shootClose() } }
+            toggle?.let { builder.register(it) { if (active && targetVelocity == farTarget) stop() else shoot() } }
+            toggleSlow?.let { builder.register(it) { if (active && targetVelocity == closeTarget) stop() else shootClose() } }
         }
     }
-    data class StateOutput(
-        var active: Boolean = false,
-        var velocity: NewRollingAverage = NewRollingAverage(5),
-        var targetVelocity: Double = 0.0,
-        @Editable
-        val pid: PID = PID(50.0, 2.0, 0.0, 1.0, 0.0, 2100.0, 0.0, 1.0),
-        var maxVelocity: Double = 0.0,
-    ): BaseCommandState()
 }

@@ -1,50 +1,39 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
+import io.github.bionictigers.axiom.core.commands.System
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
-import io.github.bionictigers.axiom.core.commands.BaseCommandState
 import io.github.bionictigers.axiom.core.commands.Command
-import io.github.bionictigers.axiom.core.commands.Scheduler
-import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Analog
-import io.github.bionictigers.axiom.core.web.Server
-import io.github.bionictigers.axiom.core.web.Server.start
 import io.github.bionictigers.axiom.core.web.WebData
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
 import org.firstinspires.ftc.teamcode.control.PID
-import org.firstinspires.ftc.teamcode.motion.Odometry
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
-import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.Matrix
+import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
-import kotlin.compareTo
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
-import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeMark
 import kotlin.time.TimeSource
-import kotlin.unaryMinus
 
 class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry? = null) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
@@ -64,16 +53,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     override val name = "Drivetrain"
 
     companion object {
-//        val xJerk = 60//00.0
-//        val yJerk = 30//00.0
-//        val angularJerk = Angle.degrees(50.0)//ngle.degrees(150.0)//Angle.degrees(900.0)
-//        val xMaxAcceleration = 35//09.0
-//        val yMaxAcceleration = 35//69.0/4.0
-//        val angularMaxAcceleration = Angle.degrees(90.0) //900 //130
-//        val xMaxVelocity = 10//03.0
-//        val yMaxVelocity = 18//12.0
-//        val angularMaxVelocity = Angle.degrees(30.0)//390
-//
+        // TODO: test values and note units
         val xJerk = 6000.0
         val yJerk = 3000.0
         val angularJerk = Angle.degrees(9000.0)//Angle.degrees(900.0)
@@ -84,6 +64,9 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         val yMaxVelocity = 1812.0
         val angularMaxVelocity = Angle.degrees(390.0)//390
 
+        // TODO: find real values,
+        // in ticks/second
+        val wheelMaxVel = 350.0 * 2
 
         val xProfile = MotionProfile(xJerk, xMaxAcceleration, xMaxVelocity)
         val yProfile = MotionProfile(yJerk, yMaxAcceleration, yMaxVelocity)
@@ -98,132 +81,128 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             )
         )
 
-        fun calculatePowers(x: Double, y: Double, rot: Double): List<Double> {
-//            val direction = atan2(y, x)
-
-            val fL = y - x + rot * 4
-            val fR = y + x - rot * 4
-            val bL = y + x + rot * 4
-            val bR = y - x - rot * 4
-
-            return listOf(-fL, -bL, fR, bR)
-        }
-
-        fun fieldOriented(x: Double, y: Double, rot: Double) {
-
-        }
+        val testBotDirections = listOf(DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.FORWARD)
+        val autoDirections = listOf(DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.REVERSE)
     }
+
+    /* We only need to set these if we are using driver control */
+    var driveOrientation: DriveOrientation? = null
+    var xControl: Double = 0.0
+    var yControl: Double = 0.0
+    var rotControl: Double = 0.0
+
+    val isInTeleop get() = driveOrientation != null
 
     val motors = DriveMotors(hardwareMap)
+    val pids = MotorPIDs()
 
-    val data = DrivetrainData()
-
-    init {
-        motors.forEach {
-            it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
-            it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-        }
-//        motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
-//        motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
-//        motors.backRight.direction = DcMotorSimple.Direction.REVERSE
-
-
-//        Server.OnDrivetrainUpdate = { x, y, r ->
-//            println("$x, $y, $r")
-//            Scheduler.schedule(setXControl(x), setYControl(y), setRotControl(r))
-//        }
-    }
+    var controllerCommand: List<Double> = listOf(0.0, 0.0, 0.0, 0.0)
+    var timeChanged = TimeSource.Monotonic.markNow()
+    var powers: MotorValues<Double?> = MotorValues(0.0, 0.0, 0.0, 0.0)
 
     override val dependencies: List<System> = listOfNotNull(odometry)
+
+    var max = 0.0
+
+    var errorState: Matrix? = null
 
     private val headingPID = PID(8.0, 0.0, 0.0, 0, -PI, PI, -1.0, 1.0)
     private var targetHeading = 0.0
     private var timeLetGo = TimeSource.Monotonic.markNow()
     private var rotation = 0.0
 
-    override val beforeRun = SystemCommand.create("Motor Power Calculation", data) {
+    init {
+        motors.forEach {
+            it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+            it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        }
+    }
+
+    override val update = SystemCommand.create("Motor Power Calculation") {
         enter {
-            if (it.isInTeleop) {
-//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE //these are for test bot
-//                motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
-//                motors.backLeft.direction = DcMotorSimple.Direction.FORWARD
-//                motors.backRight.direction = DcMotorSimple.Direction.REVERSE
+            if (isInTeleop) {
+                motors.forEachIndexed { index, motor -> motor.direction = testBotDirections[index] }
             } else {
-//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
-//                motors.frontRight.direction = DcMotorSimple.Direction.FORWARD
-//                motors.backLeft.direction = DcMotorSimple.Direction.REVERSE
-//                motors.backRight.direction = DcMotorSimple.Direction.FORWARD
-//                motors.frontLeft.direction = DcMotorSimple.Direction.REVERSE
-//                motors.frontRight.direction = DcMotorSimple.Direction.FORWARD
-//                motors.backLeft.direction = DcMotorSimple.Direction.FORWARD
-//                motors.backRight.direction = DcMotorSimple.Direction.FORWARD
-                motors.frontLeft.direction = DcMotorSimple.Direction.FORWARD
-                motors.frontRight.direction = DcMotorSimple.Direction.REVERSE
-                motors.backLeft.direction = DcMotorSimple.Direction.REVERSE
-                motors.backRight.direction = DcMotorSimple.Direction.REVERSE
+                motors.forEachIndexed { index, motor -> motor.direction = autoDirections[index] }
             }
         }
 
         action {
-            if (it.isInTeleop) {
+            pids.updateVelocities()
+            if (isInTeleop) {
                 if (odometry != null) {
-                    if (it.rotControl.absoluteValue > .05) {
-                        rotation = it.rotControl
+                    if (rotControl.absoluteValue > .05) {
+                        rotation = rotControl
                         timeLetGo = TimeSource.Monotonic.markNow()
                         targetHeading = odometry.position.radians % (2 * PI)
                     } else {
-                        rotation = 0.0
-//                } else {
-//                    val shortestPath = atan2(
-//                        sin(odometry.position.radians - targetHeading),
-//                        cos(odometry.position.radians - targetHeading)
-//                    )
-//                    rotation = headingPID.compute(0.0, shortestPath) / PI
-//                    println(rotation)
-//                }
+                        // TODO: fix heading PID logic
+                        val shortestPath = atan2(
+                            sin((odometry.position.radians % (2 * PI)) - targetHeading),
+                            cos((odometry.position.radians % (2 * PI)) - targetHeading)
+                        )
+                        rotation = headingPID.compute(0.0, shortestPath) / PI
                     }
+                }
+                        rotation = rotControl
+//                val newCommand = calculatePowers(-it.xControl, -it.yControl, rotation)
+//
+//                if (largeChange(newCommand, controllerCommand)) {
+//                    powers = calculatePowers(-it.xControl, -it.yControl, rotation)
+//                    timeChanged = TimeSource.Monotonic.markNow()
+//                } else if (TimeSource.Monotonic.markNow() - timeChanged < 250.milliseconds) {
+//                    powers = calculatePowers(-it.xControl, -it.yControl, rotation)
+//                } else {
+//                    powers = pids.calculatePowers(-it.xControl, -it.yControl, rotation)
+//                }
+//
+//                controllerCommand = newCommand
+
+//                powers = pids.calculatePowers(-it.xControl, -it.yControl, rotation)
+
+                if (calculateRawPowers(xControl, yControl, rotation).all { it == 0.0 } ) pids.reset()
+                powers.set(pids.calculatePowers(xControl, yControl, rotation))
+
+                telemetry?.addData("pid", pids)
+                telemetry?.addData("powers", powers)
+            } else {
+                if (errorState != null) {
+                    val target = (-K * errorState!!).scalar(.01)
+                    telemetry?.addData("Error", errorState!!.printSimple())
+                    telemetry?.addData("Target Velocities", target)
+                    powers.set(pids.calculatePowers(target))
+                } else {
+                    powers.clear()
                 }
             }
         }
     }
 
-    var errorState: Matrix? = null
-
-    fun Double.toHundredths(): Double {
-        return floor(this * 100) / 100
-    }
-
-    fun List<Double>.printSimple(): String {
-        var string = ""
-        this.forEach {
-            string += it.toHundredths().toString() + ", "
+    fun largeChange(list:List<Double>, otherList: List<Double>): Boolean {
+        list.forEachIndexed { index, num ->
+            if (abs(num - otherList[index]) > .1){
+                return true
+            }
         }
-        return string
+        return false
     }
 
-    operator fun List<Double>.times(num: Double): List<Double> {
-        val result = mutableListOf<Double>()
-        this.forEach {
-            result.add(it * num)
+    fun findWheelMaxVelocity() {
+        with(pids) {
+            val newMax = velocities.min()
+            max = maxOf(max, newMax)
+            telemetry?.addData("Max Velocity", "$max, from ${motorNames[velocities.withIndex().minBy { it.value }.index]}")
         }
-        return result
     }
 
-    override val afterRun = SystemCommand.continuous("Drivetrain Update", data) {
-        if (it.isInTeleop) {
-            val powers = calculatePowers(-it.xControl, -it.yControl, rotation)
-            telemetry?.addData("Powers", powers.printSimple())
-            motors.setPower(powers)
-
-            println(odometry!!.position.degrees.toString())
-            println(odometry.position.x.toString())
-//            println(odometry.position.degrees.toString() + ", " + odometry.position.y.toString())
+    override val apply = SystemCommand.continuous("Drivetrain Update") {
+        if (isInTeleop) {
+            if (!powers.areNull) {
+                motors.setPower(powers)
+            }
         } else {
-            if (errorState != null) {
-                val controlMatrix = (-K * errorState!!)
-                telemetry?.addData("Error", errorState!!.printSimple())
-                telemetry?.addData("Control Matrix", controlMatrix.printSimple())
-                motors.setPower(controlMatrix.scalar(.4))
+            if (!powers.areNull) {
+                motors.setPower(powers)
             } else {
                 stop()
             }
@@ -238,14 +217,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             val currentPose = odometry!!.position
             xResult = xProfile.generate(currentPose.x, targetPose.x)
             yResult = yProfile.generate(currentPose.y, targetPose.y)
-            // TODO: Denormalize target angle before generating profile
-            angularResult = angularProfile.generate(currentPose.degrees, targetPose.degrees)
+
+            val targetAngle = denormalizeTargetAngle(targetPose.rotation)
+            angularResult = angularProfile.generate(0.0, targetAngle.degrees)
         }
 
         action {
             val currentPose = odometry!!.position
             val currentVelocity = odometry.velocity
-            val time = it.enteredAt?.elapsedNow() ?: Duration.ZERO
+            val time = it.enteredAt.elapsedNow()
 
             val x = currentPose.x - (xResult?.getPosition(time) ?: 0.0)
             val y = currentPose.y - (yResult?.getPosition(time) ?: 0.0)
@@ -263,10 +243,6 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             if (currentPose.within(targetPose, Pose(1,1,5))) {
                 stop()
             }
-
-//            telemetry?.addData("Current Pose", currentPose)
-//            telemetry?.addData("Target Pose", targetPose)
-//            telemetry?.addData("Error State", errorState)
         }
 
         exit {
@@ -302,27 +278,36 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    fun calculatePowers(x: Double, y: Double, rotation: Double): List<Double> {
+    fun calculateRawPowers(x: Double, y: Double, rotation: Double): List<Double> {
         val frontLeft = y - x + rotation
-        val frontRight = y + x - rotation
-        val backLeft = y + x + rotation
+        val frontRight = y + x + rotation
+        val backLeft = y + x - rotation
         val backRight = y - x - rotation
 
-        val powers = listOf(-frontLeft, backLeft, frontRight, backRight)
+        val powers = listOf(frontLeft, frontRight, backLeft, backRight)
 
         return powers.map { it }
     }
 
+    fun denormalizeTargetAngle(target: Angle) : Angle {
+        return Angle.degrees(
+            atan2(
+                sin(odometry!!.position.degrees.normalizeDegrees() - target.degrees),
+                cos(odometry.position.degrees.normalizeDegrees() - target.degrees)
+            )
+        )
+    }
+
     fun stop() = motors.setPower(0.0, 0.0, 0.0, 0.0)
 
-    fun setXControl(x: Double): Command<DrivetrainData> = SystemCommand.instant("Set X Control", data) { it.xControl = -x }
+    fun setXControl(x: Double) = SystemCommand.instant("Set X Control") { xControl = -x }
 
-    fun setYControl(y: Double): Command<DrivetrainData> = SystemCommand.instant("Set Y Control", data) { it.yControl = -y }
+    fun setYControl(y: Double) = SystemCommand.instant("Set Y Control") { yControl = -y }
 
     private val rotMulti: Double
-        get() = 1 - (data.xControl.absoluteValue.coerceAtLeast(data.yControl.absoluteValue) * .6)
+        get() = 1 - (xControl.absoluteValue.coerceAtLeast(yControl.absoluteValue) * .6)
 
-    fun setRotControl(rot: Double): Command<DrivetrainData> = SystemCommand.instant("Set Rot Control", data) { it.rotControl = -rot * rotMulti }
+    fun setRotControl(rot: Double) = SystemCommand.instant("Set Rot Control") { rotControl = -rot * rotMulti }
 
     override fun bindControls(
         profile: BaseProfile,
@@ -331,14 +316,14 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     ): Unit =
         with(profile.drivetrain) {
             if (!gamepad.matches(desiredGamepad)) return
-            data.driveOrientation = orientation
+            driveOrientation = orientation
 
             builder.register(x) { setXControl(it * x.modifier) }
             builder.register(y) { setYControl(it * y.modifier) }
             builder.register(rot) { setRotControl(abs(it).pow(1.5) * sign(it)) }
         }
 
-    data class DriveMotors(
+    inner class DriveMotors(
         val frontLeft: DcMotorEx,
         val frontRight: DcMotorEx,
         val backLeft: DcMotorEx,
@@ -351,38 +336,220 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             hardwareMap.getByName<DcMotorEx>("backRight")
         )
 
-        fun setPower(frontLeft: Double, backLeft: Double, frontRight: Double, backRight: Double) {
-            val ratio = maxOf(abs(frontLeft), abs(backLeft), abs(frontRight), abs(backRight), 1.0)
+        fun setPower(frontLeft: Double, frontRight: Double, backLeft: Double, backRight: Double) {
+            val ratio = maxOf(abs(frontLeft), abs(frontRight), abs(backLeft), abs(backRight), 1.0)
 
             if (frontLeft != this.frontLeft.power) this.frontLeft.ePower = frontLeft / ratio
-            if (backLeft != this.backLeft.power) this.backLeft.ePower = backLeft / ratio
             if (frontRight != this.frontRight.power) this.frontRight.ePower = frontRight / ratio
+            if (backLeft != this.backLeft.power) this.backLeft.ePower = backLeft / ratio
             if (backRight != this.backRight.power) this.backRight.ePower = backRight / ratio
 
-            WebData.setDrivetrain(frontLeft, -frontRight, backLeft, -backRight)
+            WebData.setDrivetrain(frontLeft, frontRight, backLeft, backRight)
         }
 
-        fun setPower(power: Double) {
-            setPower(power, power, power, power)
+        fun setPower(power: Double) { setPower(power, power, power, power) }
 
-        }
+        fun setPower(powers: List<Double>) { setPower(powers[0], powers[1], powers[2], powers[3]) }
 
-        fun setPower(powers: List<Double>) {
-            setPower(powers[0], powers[1], powers[2], powers[3])
-        }
+        fun setPower(matrix: Matrix) { setPower(matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0]) }
 
-        fun setPower(matrix: Matrix) {
-            setPower(matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0])
+        fun setPower(powers: MotorValues<Double?>) {
+            if (!powers.areNull) setPower(powers[0]!!, powers[1]!!, powers[2]!!, powers[3]!!)
         }
 
         override operator fun iterator() = listOf(frontLeft, frontRight, backLeft, backRight).iterator()
+
+        operator fun get(index: Int) = listOf(frontLeft, frontRight, backLeft, backRight)[index]
     }
 
-    data class DrivetrainData(
-        /* We only need to set these if we are using driver control */
-        var driveOrientation: DriveOrientation? = null,
-        var xControl: Double = 0.0,
-        var yControl: Double = 0.0,
-        var rotControl: Double = 0.0,
-    ) : BaseCommandState() { val isInTeleop get() = driveOrientation != null }
+    inner class MotorPIDs() {
+        // TODO: tune wheel velocity PIDs
+        val pids = MotorValues(
+            PID(1.0, 100.0, 0.0, 0, -wheelMaxVel, wheelMaxVel, -1.0, 1.0),
+            PID(1.0, 100.0, 0.0, 0, -wheelMaxVel, wheelMaxVel, -1.0, 1.0),
+            PID(1.0, 100.0, 0.0, 0, -wheelMaxVel, wheelMaxVel, -1.0, 1.0),
+            PID(1.0, 100.0, 0.0, 0, -wheelMaxVel, wheelMaxVel, -1.0, 1.0)
+        )
+
+        val setPoints = MotorValues<Double?>(null, null, null, null)
+
+        val velocities = MotorValues(0.0, 0.0, 0.0, 0.0)
+
+        val rawPowers = MotorValues(0.0, 0.0, 0.0, 0.0)
+
+        val modifiers = MotorValues(0.0, 0.0, 0.0, 0.0)
+
+        val rollingAverages = MotorValues(
+            RollingAverage(3),
+            RollingAverage(3),
+            RollingAverage(3),
+            RollingAverage(3)
+        )
+
+        fun updateVelocities() {
+            rollingAverages.forEachIndexed { index, it ->
+                it += motors[index].velocity
+                velocities[index] = it.average
+            }
+        }
+
+        fun calculatePowers(x: Double, y: Double, rotation: Double) : List<Double> {
+            rawPowers.set(calculateRawPowers(x, y, rotation))
+            modifiers.set(calculateModifiers(x, y, rotation))
+            return rawPowers.zip(modifiers) { power, mod -> power + mod }
+        }
+
+        fun calculatePowers(matrix: Matrix) : List<Double> {
+            rawPowers.set(listOf(matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0]))
+            modifiers.set(calculateModifiers(matrix))
+            return rawPowers.zip(modifiers) { power, mod -> power + mod }
+        }
+
+        fun calculateModifiers(x: Double, y: Double, rotation: Double) : List<Double> {
+            setTargets(x, y, rotation)
+            return calculateModifiers()
+        }
+
+        fun calculateModifiers(matrix: Matrix) : List<Double> {
+            setTargets(matrix)
+            return calculateModifiers()
+        }
+
+        fun calculateModifiers() : List<Double> = pids.mapIndexed { index, pid -> pid.compute(velocities[index], setPoints[index]?: 0.0) }
+
+        fun setTargets(matrix: Matrix) {
+            val frontLeft = matrix[0, 0]
+            val frontRight = matrix[1, 0]
+            val backLeft = matrix[2, 0]
+            val backRight = matrix[3, 0]
+
+            val maxSP = maxOf(abs(frontLeft), abs(backLeft), abs(frontRight), abs(backRight))
+            setPoints.set(
+                if (maxSP > wheelMaxVel) {
+                    listOf(
+                        frontLeft / maxSP * wheelMaxVel,
+                        frontRight / maxSP * wheelMaxVel,
+                        backLeft / maxSP * wheelMaxVel,
+                        backRight / maxSP * wheelMaxVel
+                    )
+                } else {
+                    listOf(frontLeft, frontRight, backLeft, backRight)
+                }
+            )
+        }
+
+        fun setTargets(x: Double, y: Double, rotation: Double) {
+            val frontLeft = y - x + rotation
+            val frontRight = y + x + rotation
+            val backLeft = y + x - rotation
+            val backRight = y - x - rotation
+
+            val ratio = maxOf(abs(frontLeft), abs(backLeft), abs(frontRight), abs(backRight), 1.0)
+            setPoints.set(
+                listOf(
+                    frontLeft / ratio * wheelMaxVel,
+                    frontRight / ratio * wheelMaxVel,
+                    backLeft / ratio * wheelMaxVel,
+                    backRight / ratio * wheelMaxVel
+                )
+            )
+        }
+
+        fun clear() {
+            setPoints.clear()
+            reset()
+        }
+
+        fun reset() { pids.forEach { it.reset() } }
+
+        override fun toString(): String {
+            fun Double.toHundredths(): Double = floor(this * 100) / 100
+            var string = "\n"
+            if (!setPoints.areNull) {
+                this.setPoints.forEachIndexed { index, it ->
+                    string += "   ${motorNames[index]} | Set Point: ${it?.toHundredths()}, Current: ${velocities[index].toHundredths()}, Raw Power ${rawPowers[index].toHundredths()}, Modifier, ${modifiers[index].toHundredths()}"
+                    if (index < 3) {
+                        string += "\n"
+                    }
+                }
+                return string
+            }
+            return "Not set"
+        }
+    }
+
+    val motorNames = listOf("FL", "FR", "BL", "BR")
+    inner class MotorValues<T>(
+        var frontLeft: T,
+        var frontRight: T,
+        var backLeft: T,
+        var backRight: T
+    ) : Iterable<T> {
+        override fun iterator(): Iterator<T> = object : Iterator<T> {
+            private var index = 0
+
+            override fun hasNext(): Boolean = index < 4
+
+            override fun next(): T = when (index++) {
+                0 -> frontLeft
+                1 -> frontRight
+                2 -> backLeft
+                3 -> backRight
+                else -> throw NoSuchElementException()
+            }
+        }
+
+        operator fun get(index: Int): T = when (index) {
+            0 -> frontLeft
+            1 -> frontRight
+            2 -> backLeft
+            3 -> backRight
+            else -> throw IndexOutOfBoundsException("Motor index must be between 0 and 3")
+        }
+
+        operator fun set(index: Int, value: T) = when (index) {
+            0 -> frontLeft = value
+            1 -> frontRight = value
+            2 -> backLeft = value
+            3 -> backRight = value
+            else -> throw IndexOutOfBoundsException("Motor index must be between 0 and 3")
+        }
+
+        fun set(list: List<T>) {
+            list.forEachIndexed { index, it -> this[index] = it }
+        }
+
+        fun set(fl: T, fr: T, bl: T, br: T) {
+            this[0] = fl
+            this[1] = fr
+            this[2] = bl
+            this[3] = br
+        }
+
+        override fun toString(): String {
+            fun Double.toHundredths(): Double = (floor(this * 100) / 100)
+            if (this.isOfType<Double>()) {
+                return this.mapIndexed { index, it -> "${motorNames[index]} | ${(it as Double).toHundredths()}" }.joinToString(", ")
+            }
+            return this.mapIndexed { index, it -> "${motorNames[index]} | $it" }.joinToString(", ")
+        }
+
+        inline fun <reified T> isOfType(): Boolean = this.any { it is T }
+    }
+
+    val <T> MotorValues<T?>.areNull: Boolean
+        get() {
+            return frontLeft == null && frontRight == null && backLeft == null && backRight == null
+        }
+
+    fun <T> MotorValues<Number>.equal(number: Number): Boolean {
+        return this.any { it.toDouble() == number.toDouble() }
+    }
+
+    fun <T> MotorValues<T?>.clear() {
+        frontLeft = null
+        frontRight = null
+        backLeft = null
+        backRight = null
+    }
 }

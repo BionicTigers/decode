@@ -1,8 +1,6 @@
 package org.firstinspires.ftc.teamcode.control
 
-import io.github.bionictigers.axiom.core.commands.Scheduler
 import io.github.bionictigers.axiom.core.web.Display
-import java.util.SortedMap
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -72,8 +70,8 @@ class DynamicPID(
         this.tD = tD
     }
 
-    override fun compute(processValue: Double, setpoint: Double): Double {
+    override fun compute(processValue: Double, setPoint: Double): Double {
         updateGains()
-        return super.compute(processValue, setpoint)
+        return super.compute(processValue, setPoint)
     }
 }

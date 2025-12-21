@@ -2,15 +2,15 @@ package org.firstinspires.ftc.teamcode.autos
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import io.github.bionictigers.axiom.core.commands.Scheduler
 import io.github.bionictigers.axiom.core.commands.groups.concurrent
 import io.github.bionictigers.axiom.core.commands.groups.sequential
+import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
 import org.firstinspires.ftc.teamcode.mechanisms.Kicker
 import org.firstinspires.ftc.teamcode.mechanisms.Output
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
-import org.firstinspires.ftc.teamcode.motion.Odometry
+import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.utils.Pose
 import kotlin.time.Duration.Companion.seconds
 
@@ -22,7 +22,7 @@ class BlueFarAuto : LinearOpMode() {
         val intake = Intake(hardwareMap, drivetrain)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry)
-        val output = Output(hardwareMap, telemetry)
+        val output = Output(hardwareMap, kicker, telemetry)
 
         val backUp = sequential {
             concurrent {
@@ -54,11 +54,11 @@ class BlueFarAuto : LinearOpMode() {
         waitForStart()
 
         while (opModeIsActive()) {
-            Scheduler.update()
+            Scheduler.tick()
             telemetry.update()
         }
 
-        Scheduler.reset()
+        Scheduler.clear()
     }
 
 }

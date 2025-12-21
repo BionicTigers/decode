@@ -14,8 +14,8 @@ import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Pose
 import kotlin.time.TimeSource
 
-@TeleOp(name = "Main Control")
-class MainControl : LinearOpMode() {
+@TeleOp(name = "Solo Control")
+class SoloControl : LinearOpMode() {
     override fun runOpMode() {
         val b = TimeSource.Monotonic.markNow()
         val odometry = Odometry(hardwareMap, telemetry, Pose(0, 0, 0))
@@ -24,7 +24,7 @@ class MainControl : LinearOpMode() {
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry)
         val output = Output(hardwareMap, kicker, telemetry)
-        val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
+        val controls = Controls(gamepad1, gamepad1, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )
 

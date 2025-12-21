@@ -2,10 +2,9 @@ package org.firstinspires.ftc.teamcode.autos
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import io.github.bionictigers.axiom.core.commands.Scheduler
+import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
-import org.firstinspires.ftc.teamcode.motion.Odometry
-import org.firstinspires.ftc.teamcode.utils.Angle
+import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.utils.Pose
 
 @Autonomous(name = "LQR Test", group = "autonomous")
@@ -19,10 +18,10 @@ class LQRTest : LinearOpMode() {
         waitForStart()
         Scheduler.schedule(drivetrain.mtpNoProfile(pose))
         while (opModeIsActive()) {
-            Scheduler.update()
+            Scheduler.tick()
             telemetry.update()
         }
 
-        Scheduler.reset()
+        Scheduler.clear()
     }
 }

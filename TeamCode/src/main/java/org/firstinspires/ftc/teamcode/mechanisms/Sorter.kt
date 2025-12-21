@@ -1,14 +1,8 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
-import com.qualcomm.robotcore.hardware.ColorSensor
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
-import com.qualcomm.robotcore.hardware.DcMotorSimple
-import com.qualcomm.robotcore.hardware.DigitalChannel
 import com.qualcomm.robotcore.hardware.HardwareMap
-import com.qualcomm.robotcore.hardware.configuration.typecontainers.DigitalIoDeviceConfigurationType
-import io.github.bionictigers.axiom.core.commands.BaseCommandState
-import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -19,13 +13,11 @@ import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.DynamicPID
 import org.firstinspires.ftc.teamcode.control.GainSchedule
-import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.abs
-import kotlin.math.absoluteValue
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -34,6 +26,21 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Sorter"
+
+    var step: Int = 0
+    var angle: Double = 0.0
+    var target: Double = 0.0
+    var ticks: Double = 0.0
+    val pid: DynamicPID = DynamicPID(GainSchedule(
+        mapOf(
+            0.0 to 3.0, //8.0,
+            90.0 to 3.0, //1.5,
+            180.0 to 3.0, //.4, //2, 1.5, .75
+        ),
+        mapOf(0.0 to 0.0),
+        mapOf(0.0 to 0.0)
+    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
+    val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
 
     enum class BallColor {
         Green,
@@ -53,80 +60,78 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
     val motor = hardwareMap.getByName<DcMotorEx>("sorter")
     val hub = ControlHub(hardwareMap, "Control Hub")
-    val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
-    val limitSwitch = hardwareMap.getByName<DigitalChannel>("limitSwitch")
-
-    val state = SorterState(hub)
+//    val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
+//    val limitSwitch = hardwareMap.getByName<DigitalChannel>("limitSwitch")
 
     init {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         hub.setJunkTicks(3)
-        state.pid.reset()
+        pid.reset()
     }
 
-    override val beforeRun = SystemCommand.continuous("Sorter Update", state) {
-        val isGreen = colorSensor.green() > 200
-        val isPurple = colorSensor.red() > 100 && colorSensor.blue() > 100
-
-        if (isGreen)
-            it.colors[it.step] = BallColor.Green
-        else if (isPurple)
-            it.colors[it.step] = BallColor.Purple
-
-        if (kicker?.state?.kickedThisCycle ?: false) {
-            it.colors[(it.step + 2) % 3] = BallColor.None
-        }
-        if (limitSwitch.state) {
-            println("on")
-        } else {
-            println("off")
-        }
+    override val update = SystemCommand.continuous("Sorter Update") {
+//        val isGreen = colorSensor.green() > 200
+//        val isPurple = colorSensor.red() > 100 && colorSensor.blue() > 100
+//
+//        if (isGreen)
+//            colors[step] = BallColor.Green
+//        else if (isPurple)
+//            colors[step] = BallColor.Purple
+//
+//        if (kicker?.state?.kickedThisCycle ?: false) {
+//            colors[(step + 2) % 3] = BallColor.None
+//        }
+//        if (limitSwitch.state) {
+//            println("on")
+//        } else {
+//            println("off")
+//        }
     }
 
-    override val afterRun = SystemCommand.continuous("Sorter Update", state) {
+    override val apply = SystemCommand.continuous("Sorter Update") {
         hub.refreshBulkData()
 
         val deltaTicks = hub.getEncoderTicks(3)
 
-        it.angle -= (deltaTicks / 8192.0) * 360.0
+        angle -= (deltaTicks / 8192.0) * 360.0
 
-        if (it.angle < 0) {
-            it.angle += 360.0
+        if (angle < 0) {
+            angle += 360.0
         }
 
-        it.angle %= 360.0
+        angle %= 360.0
 
-        telemetry?.addData("step", it.step)
+        telemetry?.addData("step", step)
         telemetry?.addData("ticks from encoder", hub.getEncoderTicks(3))
-        telemetry?.addData("angle", it.angle)
-        telemetry?.addData("target", it.target)
+        telemetry?.addData("angle", angle)
+        telemetry?.addData("target", target)
         telemetry?.addData("power", motor.power)
 
-        when (it.step) {
-            0 -> it.target = 0.0
-            1 -> it.target = 120.0
-            2 -> it.target = 240.0
+        when (step) {
+            0 -> target = 0.0
+            1 -> target = 120.0
+            2 -> target = 240.0
         }
 
         val error = -Math.toDegrees(
             atan2(
-                sin(Math.toRadians(it.target - it.angle)),
-                cos(Math.toRadians(it.target - it.angle))
+                sin(Math.toRadians(target - angle)),
+                cos(Math.toRadians(target - angle))
             )
         )
 
         telemetry?.addData("error", error)
 
         if (abs(error) > .5)
-            motor.ePower = -it.pid.compute(0.0, error)
+            motor.ePower = -pid.compute(0.0, error)
         else
             motor.ePower = 0.0
 
-        if (kicker?.state?.reset ?: false) {
-            if (!kicker.state.up)
-                motor.ePower -= .3
+        if (kicker?.reset ?: false) {
+            if (!kicker.up)
+                motor.ePower -= .35
             else
-                motor.ePower -= .175
+                motor.ePower -= .35
         }
 
 
@@ -136,39 +141,39 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //    override val beforeRun = SystemCommand.continuous("Sorter Update Simple", state) {
 //        hub.refreshBulkData()
 //
-//        it.ticks = hub.getEncoderTicks(3).toDouble()
+//        ticks = hub.getEncoderTicks(3).toDouble()
 //
-//        telemetry.addData("ticks from encoder", it.ticks)
-//        telemetry.addData("target", it.target)
+//        telemetry.addData("ticks from encoder", ticks)
+//        telemetry.addData("target", target)
 //        telemetry.addData("power", motor.power)
 //
-//        if (abs(it.target - it.ticks) > 5)
-//            motor.power = pid.compute(it.ticks, it.target)
+//        if (abs(target - ticks) > 5)
+//            motor.power = pid.compute(ticks, target)
 //        else
 //            motor.power = 0.0
 //    }
 
-    fun moveForward() = SystemCommand.instant("sorter increment", state) {
-        it.step = (it.step + 1) % 3
+    fun moveForward() = SystemCommand.instant("sorter increment") {
+        step = (step + 1) % 3
     }
 
-    fun moveBackward() = SystemCommand.instant("sorter decrement", state) {
-        it.step = (it.step + 2) % 3
+    fun moveBackward() = SystemCommand.instant("sorter decrement") {
+        step = (step + 2) % 3
     }
 
-    fun forward() = SystemCommand.instant("sorter forward", state) {
-        it.target = (it.ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 + 8192.0 / 3.0
+    fun forward() = SystemCommand.instant("sorter forward") {
+        target = (ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 + 8192.0 / 3.0
     }
 
-    fun backward() = SystemCommand.instant("sorter forward", state) {
-        it.target = (it.ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 - 8192.0 / 3.0
+    fun backward() = SystemCommand.instant("sorter forward") {
+        target = (ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 - 8192.0 / 3.0
     }
 
-    fun targetGreen() = SystemCommand.instant("target green", state) {
-        val currentStep = state.step
+    fun targetGreen() = SystemCommand.instant("target green") {
+        val currentStep = step
         val desiredOutputStep = (currentStep + 2) % 3
 
-        val greenSteps = state.colors.mapIndexed { index, color -> if (color == BallColor.Green) index else -1 }.filter { it != -1 }
+        val greenSteps = colors.mapIndexed { index, color -> if (color == BallColor.Green) index else -1 }.filter { it != -1 }
         if (greenSteps.isEmpty()) return@instant
 
         // Choose the nearest forward-rotation green index (respecting forward-only major movement)
@@ -183,14 +188,14 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val deltaStepsToOutput = (desiredOutputStep - nearestGreenIndex + 3) % 3
         val newStep = (currentStep + deltaStepsToOutput) % 3
 
-        state.step = newStep
+        step = newStep
     }
 
-    fun targetPurple() = SystemCommand.instant("target purple", state) {
-        val currentStep = state.step
+    fun targetPurple() = SystemCommand.instant("target purple") {
+        val currentStep = step
         val desiredOutputStep = (currentStep + 2) % 3
 
-        val purpleSteps = state.colors.mapIndexed { index, color -> if (color == BallColor.Purple) index else -1 }.filter { it != -1 }
+        val purpleSteps = colors.mapIndexed { index, color -> if (color == BallColor.Purple) index else -1 }.filter { it != -1 }
         if (purpleSteps.isEmpty()) return@instant
 
         val forwardDistances = purpleSteps.map { targetIndex ->
@@ -203,31 +208,31 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val deltaStepsToOutput = (desiredOutputStep - nearestPurpleIndex + 3) % 3
         val newStep = (currentStep + deltaStepsToOutput) % 3
 
-        state.step = newStep
+        step = newStep
     }
 
-    fun openIntake() = SystemCommand.instant("open intake", state) {
-        val currentStep = state.step
+    fun openIntake() = SystemCommand.instant("open intake") {
+        val currentStep = step
         val desiredStep = 0
 
-        val noneSteps = state.colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
+        val noneSteps = colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
         if (noneSteps.isEmpty()) return@instant
 
         val deltas = noneSteps.map { idx -> idx to ((desiredStep - idx + 3) % 3) }
         val (_, minDelta) = deltas.minBy { it.second }
-        state.step = (currentStep + minDelta) % 3
+        step = (currentStep + minDelta) % 3
     }
 
-    fun openHuman() = SystemCommand.instant("open human", state) {
-        val currentStep = state.step
+    fun openHuman() = SystemCommand.instant("open human") {
+        val currentStep = step
         val desiredStep = 2
 
-        val noneSteps = state.colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
+        val noneSteps = colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
         if (noneSteps.isEmpty()) return@instant
 
         val deltas = noneSteps.map { idx -> idx to ((desiredStep - idx + 3) % 3) }
         val (_, minDelta) = deltas.minBy { it.second }
-        state.step = (currentStep + minDelta) % 3
+        step = (currentStep + minDelta) % 3
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -242,22 +247,4 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             openHuman?.let { builder.register(it) { openHuman() } }
         }
     }
-
-    data class SorterState(
-        val hub: ControlHub,
-        var step: Int = 0,
-        var angle: Double = 0.0,
-        var target: Double = 0.0,
-        var ticks: Double = 0.0,
-        val pid: DynamicPID = DynamicPID(GainSchedule(
-            mapOf(
-                0.0 to 8.0,
-                90.0 to 1.5,
-                180.0 to .4, //2, 1.5, .75
-            ),
-            mapOf(0.0 to 0.0),
-            mapOf(0.0 to 0.0)
-        ), 0.0, -180.0, 180.0, -.8, .8, 20.milliseconds, { abs(it) }),
-        val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
-    ) : BaseCommandState()
 }

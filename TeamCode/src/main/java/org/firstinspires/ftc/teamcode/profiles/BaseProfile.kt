@@ -47,7 +47,7 @@ open class BaseProfile {
         override val kick : Digital = Digital.X.press()
         override val up : Digital = Digital.DPAD_UP.press()
         override val down: Digital = Digital.DPAD_DOWN.press()
-        override val desiredGamepad = Gamepads.BOTH
+        override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
     companion object {

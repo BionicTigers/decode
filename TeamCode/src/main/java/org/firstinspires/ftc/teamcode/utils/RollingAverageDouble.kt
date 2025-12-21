@@ -8,7 +8,7 @@ import java.util.Queue
  * Calculate a rolling average from a stream of numbers. Only the last 'size' elements will be
  * considered.
  */
-class NewRollingAverage(var size: Int) {
+class RollingAverage(var size: Int) {
     private val queue: Queue<Double> = LinkedList()
     private var total: Double = 0.0
 

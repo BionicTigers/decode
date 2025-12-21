@@ -1,9 +1,8 @@
-package org.firstinspires.ftc.teamcode.motion
+package org.firstinspires.ftc.teamcode.mechanisms
 
 import com.qualcomm.robotcore.hardware.HardwareMap
-import io.github.bionictigers.axiom.core.commands.*
+import io.github.bionictigers.axiom.core.commands.System
 import org.firstinspires.ftc.robotcore.external.Telemetry
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit
 import org.firstinspires.ftc.teamcode.drivers.GoBildaPinpointDriver
@@ -12,7 +11,6 @@ import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Matrix
 import org.firstinspires.ftc.teamcode.utils.getByName
-import org.firstinspires.ftc.teamcode.utils.interpolatedMapOf
 
 interface RobotConfig {
     /**
@@ -42,11 +40,11 @@ object Configs {
 
 class Odometry(
     hardwareMap: HardwareMap,
-    telemetry: Telemetry?,
-    startPose: Pose = Pose(0.0, 0.0, Angle.radians(0.0)),
-    private val config: RobotConfig = Configs.Main,
+    val telemetry: Telemetry?,
+    val startPose: Pose = Pose(0.0, 0.0, Angle.radians(0.0)),
+    config: RobotConfig = Configs.Main,
     override val name: String = "Odometry"
-): System() {
+) : System() {
     private val pinpoint = hardwareMap.getByName<GoBildaPinpointDriver>("pinpoint")
 
     var position = startPose
@@ -74,58 +72,57 @@ class Odometry(
      * Takes .25 seconds, robot must be stationary for the whole .25 seconds.
      * It is recommended that the imu is recalibrated before each use (at the start of an auto or teleop).
      */
-    val recalibrate: Command<BaseCommandState> = SystemCommand.instant("Odometry Recalibrate") {
+    val recalibrate = SystemCommand.instant("Odometry Recalibrate") {
         pinpoint.recalibrateIMU()
     }
 
-    override val beforeRun = SystemCommand.continuous("Odometry Update") {
+    override val update = SystemCommand.continuous("Odometry Update") {
         pinpoint.update()
-
 
         position = Pose(
             -pinpoint.getPosY(DistanceUnit.MM),
             pinpoint.getPosX(DistanceUnit.MM),
-            0.0//-Angle.radians(pinpoint.getHeading(UnnormalizedAngleUnit.RADIANS))
+            -Angle.radians(pinpoint.getHeading(UnnormalizedAngleUnit.RADIANS))
         )
 
         velocity = Pose(
             -pinpoint.getVelY(DistanceUnit.MM),
             pinpoint.getVelX(DistanceUnit.MM),
-            0.0//-Angle.radians(pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS))
+            -Angle.radians(pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS))
         )
+    }
 
+    fun log() {
         telemetry?.addData("x", position.x)
         telemetry?.addData("y", position.y)
         telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
         telemetry?.addData("x vel", velocity.x)
         telemetry?.addData("y vel", velocity.y)
         telemetry?.addData("rot vel", velocity.rotation.degrees.normalizeDegrees())
-
-
     }
 
     private var loopTimeTooLowWarning: Telemetry.Line? = null
     private var loopTimeTooHighWarning: Telemetry.Line? = null
 
-    override val afterRun = SystemCommand.continuous("Odometry Check") {
-        if (pinpoint.loopTime < 500)
-            if (loopTimeTooLowWarning == null)
-                loopTimeTooLowWarning = telemetry?.addLine("Loop time is lower than 500ms, odometry may not be accurate/something may be wrong with pods according to the GoBilda documentation.")
-            else
-                loopTimeTooLowWarning?.let {
-                    telemetry?.removeLine(loopTimeTooLowWarning)
-                    loopTimeTooLowWarning = null
-                }
-
-        if (pinpoint.loopTime > 1100)
-            if (loopTimeTooHighWarning == null)
-                loopTimeTooHighWarning = telemetry?.addLine("Loop time is higher than 1100ms, odometry may not be accurate/something may be wrong with pods according to the GoBilda documentation.")
-            else
-                loopTimeTooHighWarning?.let {
-                    telemetry?.removeLine(it)
-                    loopTimeTooHighWarning = null
-                }
-    }
+//    override val apply = SystemCommand.continuous("Odometry Check") {
+//        if (pinpoint.loopTime < 500)
+//            if (loopTimeTooLowWarning == null)
+//                loopTimeTooLowWarning = telemetry?.addLine("Loop time is lower than 500ms, odometry may not be accurate/something may be wrong with pods according to the GoBilda documentation.")
+//            else
+//                loopTimeTooLowWarning?.let {
+//                    telemetry?.removeLine(loopTimeTooLowWarning)
+//                    loopTimeTooLowWarning = null
+//                }
+//
+//        if (pinpoint.loopTime > 1100)
+//            if (loopTimeTooHighWarning == null)
+//                loopTimeTooHighWarning = telemetry?.addLine("Loop time is higher than 1100ms, odometry may not be accurate/something may be wrong with pods according to the GoBilda documentation.")
+//            else
+//                loopTimeTooHighWarning?.let {
+//                    telemetry?.removeLine(it)
+//                    loopTimeTooHighWarning = null
+//                }
+//    }
 }
 
 fun Double.normalizeDegrees() : Double {
