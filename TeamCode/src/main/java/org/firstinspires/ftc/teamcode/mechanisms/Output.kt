@@ -39,9 +39,14 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val stop: Digital?
         val toggle: Digital?
         val toggleSlow: Digital?
+
+        val spinRight: Digital?
+
+        val spinLeft: Digital?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
+    val servo = hardwareMap.getByName<Servo>("pivot")
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
     val hub = ControlHub(hardwareMap, "Control Hub")
 
@@ -108,6 +113,14 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         targetVelocity = 0.0
         active = false
     }
+    fun spinLeft() = SystemCommand.instant("Output spin left") {
+        servo.position + 0.01
+    }
+
+    fun spinRight() = SystemCommand.instant("Output spin left") {
+        servo.position - 0.01
+    }
+
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
