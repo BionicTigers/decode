@@ -30,11 +30,10 @@ open class BaseProfile {
         override val stop = null
         override val toggle = Digital.Y.press()
         override val toggleSlow = Digital.B.press()
-        override val spinRight = Digital.RIGHT_STICK_BUTTON.press()
-        override val spinLeft = Digital.LEFT_STICK_BUTTON.press()
+        override val spinRight = Analog.RIGHT_TRIGGER.continuous()
+        override val spinLeft = Analog.LEFT_TRIGGER.continuous()
+
         override val desiredGamepad = Gamepads.GAMEPAD_2
-
-
     }
 
     val sorter = object : Sorter.Schema {

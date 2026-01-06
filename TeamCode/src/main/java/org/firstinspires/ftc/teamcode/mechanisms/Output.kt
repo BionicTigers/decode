@@ -11,11 +11,13 @@ import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
+import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.ePower
@@ -29,6 +31,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
     var active: Boolean = false
     var velocity: RollingAverage = RollingAverage(5)
+
+
     var targetVelocity: Double = 0.0
     @Editable
     val pid: PID = PID(100.0, 2.0, 0.0, 1.0, 0.0, 1980.0, 0.0, 1.0)
@@ -40,13 +44,16 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val toggle: Digital?
         val toggleSlow: Digital?
 
-        val spinRight: Digital?
+        val spinRight: Analog?
 
-        val spinLeft: Digital?
+        val spinLeft: Analog?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     val servo = hardwareMap.getByName<Servo>("pivot")
+    var angle = Angle.ZERO
+    var targetAngle = angle.degrees - 1
+
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
     val hub = ControlHub(hardwareMap, "Control Hub")
 
@@ -96,6 +103,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         hub.setJunkTicks()
     }
 
+
     fun shoot() = SystemCommand.instant("Output Enable") {
 //        motor.power = .83
         targetVelocity = farTarget
@@ -113,19 +121,23 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         targetVelocity = 0.0
         active = false
     }
+
     fun spinLeft() = SystemCommand.instant("Output spin left") {
-        servo.position + 0.01
+        targetAngle -= 22.5 * it.deltaTime.seconds
+        servo.position = targetAngle / 45
     }
 
     fun spinRight() = SystemCommand.instant("Output spin left") {
-        servo.position - 0.01
+       targetAngle += 22.5 * it.deltaTime.seconds
+       servo.position = targetAngle / 45
     }
 
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
             if (!desiredGamepad.matches(gamepad)) return
-
+            spinRight?.let {builder.register(it) {spinRight()} }
+            spinLeft?.let {builder.register(it) {spinLeft()} }
             shoot?.let { builder.register(it) { shoot() } }
             stop?.let { builder.register(it) { stop() } }
             toggle?.let { builder.register(it) { if (active && targetVelocity == farTarget) stop() else shoot() } }
