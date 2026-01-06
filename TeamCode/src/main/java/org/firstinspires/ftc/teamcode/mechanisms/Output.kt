@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.Servo
+import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -24,9 +25,10 @@ import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.eq
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
+import kotlin.math.atan2
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, odometry: Odometry, ): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
 
     var active: Boolean = false
@@ -44,14 +46,15 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val toggle: Digital?
         val toggleSlow: Digital?
 
-        val spinRight: Analog?
 
-        val spinLeft: Analog?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     val servo = hardwareMap.getByName<Servo>("pivot")
     var angle = Angle.ZERO
+    var tagAngle = 0.0
+
+    var robotAngle = 0.0
     var targetAngle = angle.degrees - 1
 
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
@@ -71,6 +74,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     override val update = SystemCommand.continuous("Output Data") {
         hub.refreshBulkData()
         val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
+        tagAngle = atan2((36.54 - odometry.position.y),(0 - odometry.position.x)) + 180
+        robotAngle = atan2(odometry.position.y, odometry.position.x)
         if (lVel.isFinite()) {
             velocity.plusAssign(lVel)
         }
@@ -103,6 +108,11 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         hub.setJunkTicks()
     }
 
+    override val apply = SystemCommand.continuous ("output data") {
+        var turnAngle = tagAngle + robotAngle
+        servo.position = turnAngle / 45
+    }
+
 
     fun shoot() = SystemCommand.instant("Output Enable") {
 //        motor.power = .83
@@ -122,22 +132,13 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         active = false
     }
 
-    fun spinLeft() = SystemCommand.instant("Output spin left") {
-        targetAngle -= 22.5 * it.deltaTime.seconds
-        servo.position = targetAngle / 45
-    }
 
-    fun spinRight() = SystemCommand.instant("Output spin left") {
-       targetAngle += 22.5 * it.deltaTime.seconds
-       servo.position = targetAngle / 45
-    }
 
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
             if (!desiredGamepad.matches(gamepad)) return
-            spinRight?.let {builder.register(it) {spinRight()} }
-            spinLeft?.let {builder.register(it) {spinLeft()} }
+
             shoot?.let { builder.register(it) { shoot() } }
             stop?.let { builder.register(it) { stop() } }
             toggle?.let { builder.register(it) { if (active && targetVelocity == farTarget) stop() else shoot() } }
