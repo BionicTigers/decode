@@ -107,3 +107,7 @@ class Matrix(val value: Array<Array<Double>>) {
         return string
     }
 }
+
+fun emptyMatrix(): Matrix {
+    return Matrix(arrayOf(emptyArray()))
+}

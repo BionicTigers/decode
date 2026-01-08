@@ -18,6 +18,6 @@ dependencies {
     implementation "org.firstinspires.ftc:Vision:$ftc_version"
     implementation 'androidx.appcompat:appcompat:1.7.1'
 
-    implementation "io.github.bionictigers.axiom:core:0.2.1"
+    implementation "io.github.bionictigers.axiom:core:0.2.5"
 }
 

@@ -24,7 +24,8 @@ class Pose(@Editable @Display val x: Double, @Editable @Display val y: Double, @
     fun within(center: Pose, allowance: Pose): Boolean {
         return  center.x.absoluteValue + allowance.x.absoluteValue >= x.absoluteValue && center.x.absoluteValue - allowance.x.absoluteValue <= x.absoluteValue
                 && center.y.absoluteValue + allowance.y.absoluteValue >= y.absoluteValue && center.y.absoluteValue - allowance.y.absoluteValue <= y.absoluteValue
-                && center.rot.absoluteValue + allowance.rot.absoluteValue >= rot.absoluteValue && center.rot.absoluteValue - allowance.rot.absoluteValue <= rot.absoluteValue
+                && ((center.rot.absoluteValue + allowance.rot.absoluteValue >= rot.absoluteValue && center.rot.absoluteValue - allowance.rot.absoluteValue <= rot.absoluteValue)
+                ||(center.rot.absoluteValue + allowance.rot.absoluteValue >= rot.absoluteValue-360 && center.rot.absoluteValue - allowance.rot.absoluteValue <= rot.absoluteValue-360))
     }
 
     val position: Vector2

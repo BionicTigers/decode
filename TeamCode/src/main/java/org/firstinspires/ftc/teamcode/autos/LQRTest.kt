@@ -10,18 +10,19 @@ import org.firstinspires.ftc.teamcode.utils.Pose
 @Autonomous(name = "LQR Test", group = "autonomous")
 class LQRTest : LinearOpMode() {
     override fun runOpMode() {
-        val odometry = Odometry(hardwareMap, telemetry)
+        val odometry = Odometry(hardwareMap, telemetry, Pose(0.0,0.0,0.0))
         val drivetrain = Drivetrain(hardwareMap, telemetry, odometry)
-        val pose = Pose(0.0, 500.0, 0.0)
+        val pose = Pose(0.0, 600.0, 0.0)
         Scheduler.schedule(drivetrain, odometry)
 
         waitForStart()
-        Scheduler.schedule(drivetrain.mtpNoProfile(pose))
+        Scheduler.schedule(drivetrain.moveToPosition(pose))
         while (opModeIsActive()) {
             Scheduler.tick()
             telemetry.update()
         }
 
+        drivetrain.pids.clear()
         Scheduler.clear()
     }
 }

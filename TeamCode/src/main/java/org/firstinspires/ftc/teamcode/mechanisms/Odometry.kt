@@ -90,6 +90,7 @@ class Odometry(
             pinpoint.getVelX(DistanceUnit.MM),
             -Angle.radians(pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS))
         )
+        log()
     }
 
     fun log() {

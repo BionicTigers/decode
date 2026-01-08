@@ -31,7 +31,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var velocity: RollingAverage = RollingAverage(5)
     var targetVelocity: Double = 0.0
     @Editable
-    val pid: PID = PID(100.0, 2.0, 0.0, 1.0, 0.0, 1980.0, 0.0, 1.0)
+    val pid: PID = PID(2.0, 2.0, 0.0, 1.0, 0.0, 2700.0, 0.0, 1.0)
     var maxVelocity: Double = 0.0
 
     interface Schema : ControlSchema {
@@ -39,20 +39,23 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val stop: Digital?
         val toggle: Digital?
         val toggleSlow: Digital?
+        val aimLeft: Digital
+        val aimRight: Digital
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
+    val turret = hardwareMap.getByName<Servo>("turret")
     val hub = ControlHub(hardwareMap, "Control Hub")
 
     init {
-        motor.direction = DcMotorSimple.Direction.REVERSE
+        motor.direction = DcMotorSimple.Direction.FORWARD
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         motor.mode == DcMotor.RunMode.RUN_WITHOUT_ENCODER
         hub.setJunkTicks()
     }
     companion object {
-        var farTarget = 1980.0
+        var farTarget = 2700.0//1980.0
         var closeTarget = 1720.0
     }
 
@@ -109,6 +112,14 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         active = false
     }
 
+    fun turnLeft() = SystemCommand.instant("Output Aim Left") {
+        turret.position += .1
+    }
+
+    fun turnRight() = SystemCommand.instant("Output Aim Right") {
+        turret.position += -.1
+    }
+
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
             if (!desiredGamepad.matches(gamepad)) return
@@ -117,6 +128,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             stop?.let { builder.register(it) { stop() } }
             toggle?.let { builder.register(it) { if (active && targetVelocity == farTarget) stop() else shoot() } }
             toggleSlow?.let { builder.register(it) { if (active && targetVelocity == closeTarget) stop() else shootClose() } }
+            aimLeft?.let { builder.register(it) { turnLeft() } }
+            aimRight?.let { builder.register(it) { turnRight() } }
         }
     }
 }

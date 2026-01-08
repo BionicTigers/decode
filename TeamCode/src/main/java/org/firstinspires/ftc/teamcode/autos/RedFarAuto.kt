@@ -43,7 +43,7 @@ class RedFarAuto : LinearOpMode() {
             wait(1.seconds)
             concurrent {
                 add(output.stop())
-                add(drivetrain.mtpNoProfile(Pose(-500, 400, 0.0)))
+                add(drivetrain.moveToPosition(Pose(-500, 400, 0.0)))
             }
         }
 
