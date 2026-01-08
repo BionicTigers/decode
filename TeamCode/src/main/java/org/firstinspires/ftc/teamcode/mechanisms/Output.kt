@@ -5,26 +5,30 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.Servo
+import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
+import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.eq
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
+import kotlin.math.atan2
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, odometry: Odometry, ): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
 
     var active: Boolean = false
@@ -44,6 +48,12 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
+    var angle = Angle.ZERO
+    var tagAngle = 0.0
+
+    var robotAngle = 0.0
+    var targetAngle = angle.degrees - 1
+
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
     val turret = hardwareMap.getByName<Servo>("turret")
     val hub = ControlHub(hardwareMap, "Control Hub")
@@ -62,6 +72,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     override val update = SystemCommand.continuous("Output Data") {
         hub.refreshBulkData()
         val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
+        tagAngle = atan2((36.54 - odometry.position.y),(0 - odometry.position.x)) + 180
+        robotAngle = atan2(odometry.position.y, odometry.position.x)
         if (lVel.isFinite()) {
             velocity.plusAssign(lVel)
         }
@@ -93,6 +105,12 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
         hub.setJunkTicks()
     }
+
+    override val apply = SystemCommand.continuous ("output data") {
+        var turnAngle = tagAngle + robotAngle
+        turret.position = turnAngle / 45
+    }
+
 
     fun shoot() = SystemCommand.instant("Output Enable") {
 //        motor.power = .83
