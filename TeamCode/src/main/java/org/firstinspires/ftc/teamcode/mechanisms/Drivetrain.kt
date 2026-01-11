@@ -58,6 +58,17 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     override val name = "Drivetrain"
 
+    var speedMultiplier = 1.0
+        set(value) {
+            xProfile.setConstants(xJerk * value, xMaxAcceleration * value, xMaxVelocity * value)
+            yProfile.setConstants(yJerk * value, yMaxAcceleration * value, yMaxVelocity * value)
+            angularProfile.setConstants(
+                angularJerk.radians * value,
+                angularMaxAcceleration.radians * value,
+                angularMaxVelocity.radians * value
+            )
+        }
+
     companion object {
         // TODO: test values and note units
         // values are in mm, need to swap to m for LQR calculations

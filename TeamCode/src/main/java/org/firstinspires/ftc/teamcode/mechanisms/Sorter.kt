@@ -31,6 +31,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var angle: Double = 0.0
     var target: Double = 0.0
     var ticks: Double = 0.0
+    var isOutput: Boolean = true
     val pid: DynamicPID = DynamicPID(GainSchedule(
         mapOf(
             0.0 to 3.0, //8.0,

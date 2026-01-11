@@ -8,12 +8,18 @@ import kotlin.math.sqrt
 import kotlin.time.Duration
 
 data class MotionProfile(
-    val jerk: Number,
-    val maxAcceleration: Number,
-    val maxVelocity: Number,
+    var jerk: Number,
+    var maxAcceleration: Number,
+    var maxVelocity: Number,
     val voltageConstant: Number? = null,
     val points: Int = 600
 ) {
+    fun setConstants(jerk: Number, maxAcceleration: Number, maxVelocity: Double) {
+        this.jerk = jerk
+        this.maxAcceleration = maxAcceleration
+        this.maxVelocity = maxVelocity
+    }
+
     fun generate(start: Number, final: Number, startingVelocity: Number? = null) =
         generateMotionProfile(
             start.toDouble(),
