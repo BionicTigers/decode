@@ -240,9 +240,33 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    fun moveToPosition(target: Pose) = Command.create("Move to Position") {
+    override val apply = SystemCommand.continuous("Drivetrain Update") {
+        if (!inTeleop) {
+            if (mtp != null) {
+                with(mtp!!) {
+//                    println("pid calculated, ${it.deltaTime} loop time")
+                    powers.set(pids.calculatePowers(controlState))
+                    // TODO: add heading pid modifier
+
+                    telemetry?.addData("Error", errorState.printSimple())
+                    telemetry?.addData("Target Accelerations", controlState.printSimple())
+                    telemetry?.addData("pid", pids)
+                    telemetry?.addData("powers", powers)
+                }
+            } else {
+                powers.setAll(0.0) // TODO: figure out how to maintain position
+            }
+        }
+        motors.setPower(powers)
+    }
+
+    /**
+     * @param speed percentage of normal speed, 0 to 1
+     */
+    fun moveToPosition(target: Pose, speed: Double = 1.0) = Command.create("Move to Position") {
         enter {
             println("mtp")
+            speedMultiplier = speed
             val currentPose = Pose(odometry!!.position.x/1000, odometry.position.y/1000, odometry.position.radians)
             val targetPose = Pose(target.x/1000, target.y/1000, Angle.radians(target.radians))
             println(currentPose)
@@ -272,7 +296,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         action {
             if (mtp == null)
                 println("mtp stop")
-                stop()
+            stop()
         }
     }
 
@@ -303,25 +327,6 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    override val apply = SystemCommand.continuous("Drivetrain Update") {
-        if (!inTeleop) {
-            if (mtp != null) {
-                with(mtp!!) {
-//                    println("pid calculated, ${it.deltaTime} loop time")
-                    powers.set(pids.calculatePowers(controlState))
-                    // TODO: add heading pid modifier
-
-                    telemetry?.addData("Error", errorState.printSimple())
-                    telemetry?.addData("Target Accelerations", controlState.printSimple())
-                    telemetry?.addData("pid", pids)
-                    telemetry?.addData("powers", powers)
-                }
-            } else {
-                powers.setAll(0.0) // TODO: figure out how to maintain position
-            }
-        }
-        motors.setPower(powers)
-    }
 
     fun largeChange(list:List<Double>, otherList: List<Double>): Boolean {
         list.forEachIndexed { index, num ->

@@ -5,14 +5,12 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.Servo
-import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
-import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.robotcore.external.Telemetry
@@ -28,7 +26,7 @@ import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.atan2
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, odometry: Odometry, ): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, odometry: Odometry): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
 
     var active: Boolean = false
@@ -110,7 +108,6 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         var turnAngle = tagAngle + robotAngle
         turret.position = turnAngle / 45
     }
-
 
     fun shoot() = SystemCommand.instant("Output Enable") {
 //        motor.power = .83
