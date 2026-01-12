@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
+import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
 import org.firstinspires.ftc.teamcode.mechanisms.Kicker
@@ -25,11 +26,11 @@ class MainControl : LinearOpMode() {
         val sorter = Sorter(hardwareMap, kicker, telemetry)
         val output = Output(hardwareMap, kicker, telemetry, odometry)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
-            listOf(drivetrain, intake, output, sorter, kicker)
+            listOf(drivetrain,  output,  kicker, intake, sorter) // add back intake and sorter also in line 32
         )
 
         Scheduler.telemetry = telemetry
-        Scheduler.schedule(drivetrain, controls, intake, sorter, output, kicker)
+        Scheduler.schedule(drivetrain, controls, intake,output, kicker, sorter, odometry)
 
         waitForStart()
 

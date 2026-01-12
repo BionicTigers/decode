@@ -102,7 +102,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     val motors = DriveMotors(hardwareMap)
 
-    val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
+    //val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
     val encoderData = OctoQuadFWv3.EncoderDataBlock()
 
     val velocities = MotorValues(0.0, 0.0, 0.0, 0.0)
@@ -139,15 +139,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
             it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         }
-        octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
-        octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
-        octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
-        octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
-
-        octoQuad.setSingleVelocitySampleInterval(0, 10)
-        octoQuad.setSingleVelocitySampleInterval(1, 10)
-        octoQuad.setSingleVelocitySampleInterval(2, 10)
-        octoQuad.setSingleVelocitySampleInterval(3, 10)
+//        octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
+//        octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
+//        octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
+//        octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
+//
+//        octoQuad.setSingleVelocitySampleInterval(0, 10)
+//        octoQuad.setSingleVelocitySampleInterval(1, 10)
+//        octoQuad.setSingleVelocitySampleInterval(2, 10)
+//        octoQuad.setSingleVelocitySampleInterval(3, 10)
 
     }
 
@@ -163,7 +163,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
 
         action {
-            octoQuad.readAllEncoderData(encoderData)
+          //    octoQuad.readAllEncoderData(encoderData)
             if (encoderData.crcOk) {
                 updateVelocities()
             } else {
@@ -300,10 +300,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
                     powers.set(pids.calculatePowers(controlState))
                     // TODO: add heading pid modifier
 
-                    telemetry?.addData("Error", errorState.printSimple())
-                    telemetry?.addData("Target Accelerations", controlState.printSimple())
-                    telemetry?.addData("pid", pids)
-                    telemetry?.addData("powers", powers)
+//                    telemetry?.addData("Error", errorState.printSimple())
+//                    telemetry?.addData("Target Accelerations", controlState.printSimple())
+//                    telemetry?.addData("pid", pids)
+//                    telemetry?.addData("powers", powers)
                 }
             } else {
                 powers.setAll(0.0) // TODO: figure out how to maintain position
@@ -325,7 +325,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         with(pids) {
             val newMax = velocities.min()
             max = maxOf(max, newMax)
-            telemetry?.addData("Max Velocity", "$max, from ${motorNames[velocities.withIndex().minBy { it.value }.index]}")
+          //  telemetry?.addData("Max Velocity", "$max, from ${motorNames[velocities.withIndex().minBy { it.value }.index]}")
         }
     }
 

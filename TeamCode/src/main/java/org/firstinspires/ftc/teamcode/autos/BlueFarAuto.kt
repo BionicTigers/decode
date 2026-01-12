@@ -22,7 +22,7 @@ class BlueFarAuto : LinearOpMode() {
         val intake = Intake(hardwareMap, drivetrain)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry)
-        val output = Output(hardwareMap, kicker, telemetry)
+        val output = Output(hardwareMap, kicker, telemetry,odometry)
 
         val backUp = sequential {
             concurrent {

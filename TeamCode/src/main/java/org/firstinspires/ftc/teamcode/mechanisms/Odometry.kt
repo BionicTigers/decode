@@ -94,12 +94,12 @@ class Odometry(
     }
 
     fun log() {
-        telemetry?.addData("x", position.x)
-        telemetry?.addData("y", position.y)
-        telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
-        telemetry?.addData("x vel", velocity.x)
-        telemetry?.addData("y vel", velocity.y)
-        telemetry?.addData("rot vel", velocity.rotation.degrees.normalizeDegrees())
+//        telemetry?.addData("x", position.x)
+//        telemetry?.addData("y", position.y)
+//        telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
+//        telemetry?.addData("x vel", velocity.x)
+//        telemetry?.addData("y vel", velocity.y)
+//        telemetry?.addData("rot vel", velocity.rotation.degrees.normalizeDegrees())
     }
 
     private var loopTimeTooLowWarning: Telemetry.Line? = null
