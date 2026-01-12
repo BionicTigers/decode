@@ -41,7 +41,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry? = null) : System(), Controllable<BaseProfile> {
+class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry? = null, val octoQuad: OctoQuad) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
         /** Movement is relative to the robot */
         ROBOT,
@@ -113,8 +113,8 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     val motors = DriveMotors(hardwareMap)
 
-    val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
-    val encoderData = OctoQuadFWv3.EncoderDataBlock()
+//    val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
+//    val encoderData = OctoQuadFWv3.EncoderDataBlock()
 
     val velocities = MotorValues(0.0, 0.0, 0.0, 0.0)
     val rollingAverages = MotorValues(
@@ -150,15 +150,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
             it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         }
-        octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
-        octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
-        octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
-        octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
+        octoQuad.octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
+        octoQuad.octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
+        octoQuad.octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
+        octoQuad.octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
 
-        octoQuad.setSingleVelocitySampleInterval(0, 10)
-        octoQuad.setSingleVelocitySampleInterval(1, 10)
-        octoQuad.setSingleVelocitySampleInterval(2, 10)
-        octoQuad.setSingleVelocitySampleInterval(3, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(0, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(1, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(2, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(3, 10)
 
     }
 
@@ -174,13 +174,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
 
         action {
-            octoQuad.readAllEncoderData(encoderData)
-            if (encoderData.crcOk) {
-                updateVelocities()
-            } else {
-                println("CRC not ok :(")
-                telemetry?.addLine("CRC not ok :(")
-            }
+            updateVelocities()
             if (inTeleop) {
                 // rotation pid
 //                if (odometry != null) {
@@ -396,7 +390,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     fun updateVelocities() {
         rollingAverages.forEachIndexed { index, it ->
-            it += encoderData.velocities[index].toDouble() * 1/384.5 * 1000 // ticks/10ms to rev/s
+            it += octoQuad.encoderData.velocity[index].toDouble() * 1/384.5 * 1000 // ticks/10ms to rev/s
             velocities[index] = it.average
         }
     }

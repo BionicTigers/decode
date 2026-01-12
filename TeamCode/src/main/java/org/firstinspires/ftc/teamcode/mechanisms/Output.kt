@@ -26,8 +26,9 @@ import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.atan2
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, odometry: Odometry): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, odometry: Odometry, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
+    // encoder on octoQuad 4
 
     var active: Boolean = false
     var velocity: RollingAverage = RollingAverage(5)
@@ -69,7 +70,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 
     override val update = SystemCommand.continuous("Output Data") {
         hub.refreshBulkData()
-        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
+//        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
+        val lVel = octoQuad.encoderData.position[4] / it.deltaTime.seconds
         tagAngle = atan2((36.54 - odometry.position.y),(0 - odometry.position.x)) + 180
         robotAngle = atan2(odometry.position.y, odometry.position.x)
         if (lVel.isFinite()) {

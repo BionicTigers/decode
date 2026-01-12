@@ -36,7 +36,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
+class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Sorter"
 
     companion object {
@@ -113,7 +113,8 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             angle = 20.0
         } else {
             hub.refreshBulkData()
-            val deltaTicks = hub.getEncoderTicks(3)
+//            val deltaTicks = hub.getEncoderTicks(3)
+            val deltaTicks = octoQuad.encoderData.position[5]
             angle -= (deltaTicks / 8192.0) * 360.0
             if (angle < 0) {
                 angle += 360.0
