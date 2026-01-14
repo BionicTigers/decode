@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
+class Kicker(hardwareMap: HardwareMap, val telemetry: Telemetry? = null): System(), Controllable<BaseProfile> {
     override val name: String = "Kicker"
 
     var lastKickedAt: TimeMark = TimeSource.Monotonic.markNow()
@@ -27,7 +27,7 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
     @Editable
     var kickPosition: Double = .95
     @Editable
-    var upPosition: Double = 0.1
+    var upPosition: Double = 0.17
     var reset: Boolean = false
     var kickedThisCycle: Boolean = false
     var up: Boolean = false
@@ -55,6 +55,8 @@ class Kicker(hardwareMap: HardwareMap, telemetry: Telemetry? = null): System(), 
         kickedThisCycle = true
         up = false
         time = 250.milliseconds
+        telemetry?.addLine("kicked")
+        println("kicked")
     }
 
     fun up() = SystemCommand.instant("Up") {

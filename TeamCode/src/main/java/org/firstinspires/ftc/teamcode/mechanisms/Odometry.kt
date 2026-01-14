@@ -33,14 +33,14 @@ object Configs {
     }
 
     object Main: RobotConfig {
-        override val forwardOffset: Distance = Distance.inch(5.75)
+        override val forwardOffset: Distance = Distance.inch(5.656)
         override val strafeOffset: Distance = Distance.inch(0.0)
     }
 }
 
 class Odometry(
     hardwareMap: HardwareMap,
-    val telemetry: Telemetry?,
+    val telemetry: Telemetry? = null,
     val startPose: Pose = Pose(0.0, 0.0, Angle.radians(0.0)),
     config: RobotConfig = Configs.Main,
     override val name: String = "Odometry"

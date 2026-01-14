@@ -51,6 +51,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var angle = Angle.ZERO
     var tagAngle = 0.0
 
+    var currentVel = 0.0
+
     var robotAngle = 0.0
     var targetAngle = angle.degrees - 1
 
@@ -61,9 +63,9 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var junkTicks = octoQuad.encoderData.position[4]
 
     @Editable
-    var farTarget = 2700.0//1980.0
+    var farTarget = 1650.0//1980.0
     @Editable
-    var closeTarget = 1720.0
+    var closeTarget = 1400.0//1580.0
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
@@ -82,6 +84,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         if (lVel.isFinite()) {
             velocity.plusAssign(lVel)
         }
+        currentVel = velocity.average
         maxVelocity = max(velocity.average, maxVelocity)
         telemetry?.addData("maxVelocity", maxVelocity)
         telemetry?.addData("target", targetVelocity)

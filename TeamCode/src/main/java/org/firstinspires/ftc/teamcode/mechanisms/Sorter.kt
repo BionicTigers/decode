@@ -97,6 +97,9 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var junkTicks = octoQuad.encoderData.position[5]
     private var profileDirection: Double = 1.0
 
+    @Editable
+    var offset = 40
+
     var error = 0.0
     var mpTarget = 0.0
 
@@ -155,11 +158,16 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         telemetry?.addData("sorter max velocity", maxVel)
         telemetry?.addData("sorter max acceleration", maxAccel)
 
-//        val isGreen = colorSensor.green() > 200
-//        val isPurple = colorSensor.red() > 100 && colorSensor.blue() > 100
-        val (isGreen, isPurple) = Pair(false, false)
-        telemetry?.addData("green", isGreen)
-        telemetry?.addData("purple", isPurple)
+        val isGreen  = colorSensor.red() < 250 && colorSensor.green() > 200 && colorSensor.blue() < 260
+        val isPurple = colorSensor.red() > 180 && colorSensor.green() < 400 && colorSensor.blue() > 300
+
+        telemetry?.addData("red", colorSensor.red())
+        telemetry?.addData("green", colorSensor.green())
+        telemetry?.addData("blue", colorSensor.blue())
+
+
+        telemetry?.addData("green?", isGreen)
+        telemetry?.addData("purple?", isPurple)
 
 //        if (isGreen)
 //            colors[step] = BallColor.Green
@@ -240,7 +248,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             2 -> target = 240.0
         }
         if (isOutput) {
-            target += 80 // check which position flips to output position
+            target -= offset // ball in intake position flips to output position
         }
         val error = angleErrorDeg(target, angle)
         profileDirection = (-error).sign.takeIf { it != 0.0 } ?: 1.0

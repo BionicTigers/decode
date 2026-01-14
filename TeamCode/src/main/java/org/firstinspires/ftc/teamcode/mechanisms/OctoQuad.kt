@@ -33,6 +33,47 @@ class OctoQuad(hardwareMap: HardwareMap, val telemetry: Telemetry?): System() {
         }
     }
 
+    fun setEncoderDirection(index: Int, direction: OctoQuadFWv3.EncoderDirection) {
+        octoQuad.setSingleEncoderDirection(index, direction)
+    }
+
+    /**
+     * @param directions Index 0 is the direction for port 0, counts up from there.
+     * The list can end early, but it must start at port 0. Cannot have more than 8 total elements, because there are 8 ports.
+     */
+    fun setManyEncoderDirections(directions: Array<OctoQuadFWv3.EncoderDirection?>) {
+        require(directions.size <= 8)
+        directions.forEachIndexed { index, direction ->
+            if (direction != null)
+                octoQuad.setSingleEncoderDirection(index, direction)
+        }
+    }
+
+    /**
+     * @param interval Desired sample interval in milliseconds.
+     */
+    fun setVelocitySampleInterval(index: Int, interval: Int) {
+        octoQuad.setSingleVelocitySampleInterval(index, interval)
+    }
+
+    /**
+     * @param interval Desired sample interval in milliseconds.
+     */
+    fun setManyVelocitySampleIntervals(range: IntRange, interval: Int) {
+        for (i in range) {
+            octoQuad.setSingleVelocitySampleInterval(i, interval)
+        }
+    }
+
+    /**
+     * @param interval Desired sample interval in milliseconds.
+     */
+    fun setManyVelocitySampleIntervals(vararg indices: Int, interval: Int) {
+        indices.forEach {
+            octoQuad.setSingleVelocitySampleInterval(it, interval)
+        }
+    }
+
     data class EncoderData(
         @Display
         var position: Array<Int> = arrayOf(0, 0, 0, 0, 0, 0, 0, 0),

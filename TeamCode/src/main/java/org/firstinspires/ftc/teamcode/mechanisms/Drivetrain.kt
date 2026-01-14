@@ -41,7 +41,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry? = null, val octoQuad: OctoQuad) : System(), Controllable<BaseProfile> {
+class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val odometry: Odometry? = null, val octoQuad: OctoQuad) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
         /** Movement is relative to the robot */
         ROBOT,
@@ -159,7 +159,6 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         octoQuad.octoQuad.setSingleVelocitySampleInterval(1, 10)
         octoQuad.octoQuad.setSingleVelocitySampleInterval(2, 10)
         octoQuad.octoQuad.setSingleVelocitySampleInterval(3, 10)
-
     }
 
     override val update = SystemCommand.create("Motor Power Calculation") {
