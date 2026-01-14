@@ -134,7 +134,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     var powers: MotorValues<Double> = MotorValues(0.0, 0.0, 0.0, 0.0)
 
-    override val dependencies: List<System> = listOfNotNull(odometry)
+    override val dependencies: List<System> = listOfNotNull(odometry, octoQuad)
 
     var max = 0.0
 

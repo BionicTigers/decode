@@ -10,11 +10,17 @@ import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
+import io.github.bionictigers.axiom.core.web.Editable
+import org.firstinspires.ftc.teamcode.control.PID
+import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.RollingAverage
+import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.min
 
-class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): System(), Controllable<BaseProfile> {
+class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
+    //ch 1
     override val name: String = "Intake"
 
     interface Schema : ControlSchema {
@@ -26,15 +32,23 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
 
     var active: Boolean = false
-    var stillSpeed: Double = .7
+    var velocity = RollingAverage(3)
+    @Editable
+    var targetVelocity = 1200.0
+
+    @Editable
+    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 2700.0, 0.0, 1.0)
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
+        octoQuad.octoQuad.setSingleEncoderDirection(6, OctoQuadFWv3.EncoderDirection.FORWARD)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(6, 20)
     }
 
     override val apply = SystemCommand.continuous("Intake After Run") {
+        velocity.plusAssign(octoQuad.encoderData.velocity[6] * 1000 / 20)
         if (active) {
-            motor.power = 1.0
+            motor.ePower = pid.compute(velocity.average, targetVelocity)
         }
     }
 

@@ -28,6 +28,7 @@ import kotlin.math.max
 
 class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, odometry: Odometry, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
+    override val dependencies = listOf(octoQuad)
     // encoder on octoQuad 4
 
     var active: Boolean = false
@@ -57,21 +58,25 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     val turret = hardwareMap.getByName<Servo>("turret")
     val hub = ControlHub(hardwareMap, "Control Hub")
 
+    var junkTicks = octoQuad.encoderData.position[4]
+
+    @Editable
+    var farTarget = 2700.0//1980.0
+    @Editable
+    var closeTarget = 1720.0
+
     init {
-        motor.direction = DcMotorSimple.Direction.FORWARD
-        motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+        motor.direction = DcMotorSimple.Direction.REVERSE
+        motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.FLOAT
         motor.mode == DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        hub.setJunkTicks()
     }
     companion object {
-        var farTarget = 2700.0//1980.0
-        var closeTarget = 1720.0
+
     }
 
     override val update = SystemCommand.continuous("Output Data") {
-        hub.refreshBulkData()
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
-        val lVel = octoQuad.encoderData.position[4] / it.deltaTime.seconds
+        val lVel = (octoQuad.encoderData.position[4] - junkTicks) / it.deltaTime.seconds
         tagAngle = atan2((36.54 - odometry.position.y),(0 - odometry.position.x)) + 180
         robotAngle = atan2(odometry.position.y, odometry.position.x)
         if (lVel.isFinite()) {
@@ -103,7 +108,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             indcLight.position = .63
 
 
-        hub.setJunkTicks()
+        junkTicks = octoQuad.encoderData.position[4]
     }
 
     override val apply = SystemCommand.continuous ("output data") {

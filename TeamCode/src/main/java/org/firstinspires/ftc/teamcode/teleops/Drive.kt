@@ -1,31 +1,31 @@
-package org.firstinspires.ftc.teamcode.teleops
-
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp
-import io.github.bionictigers.axiom.core.input.Controls
-import io.github.bionictigers.axiom.core.scheduler.Scheduler
-import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
-import org.firstinspires.ftc.teamcode.mechanisms.Odometry
-import org.firstinspires.ftc.teamcode.profiles.BaseProfile
-
-@TeleOp(name = "Drive")
-class Drive : LinearOpMode() {
-    override fun runOpMode() {
-        val odometry = Odometry(hardwareMap, telemetry)
-        val drivetrain = Drivetrain(hardwareMap, telemetry, odometry)
-        val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
-            listOf(drivetrain)
-        )
-
-        Scheduler.telemetry = telemetry
-        Scheduler.schedule(drivetrain, controls, odometry)
-
-        waitForStart()
-
-        while (opModeIsActive()) {
-            Scheduler.tick()
-            telemetry.update()
-        }
-        Scheduler.clear()
-    }
-}
+//package org.firstinspires.ftc.teamcode.teleops
+//
+//import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+//import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+//import io.github.bionictigers.axiom.core.input.Controls
+//import io.github.bionictigers.axiom.core.scheduler.Scheduler
+//import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
+//import org.firstinspires.ftc.teamcode.mechanisms.Odometry
+//import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+//
+//@TeleOp(name = "Drive")
+//class Drive : LinearOpMode() {
+//    override fun runOpMode() {
+//        val odometry = Odometry(hardwareMap, telemetry)
+//        val drivetrain = Drivetrain(hardwareMap, telemetry, odometry)
+//        val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
+//            listOf(drivetrain)
+//        )
+//
+//        Scheduler.telemetry = telemetry
+//        Scheduler.schedule(drivetrain, controls, odometry)
+//
+//        waitForStart()
+//
+//        while (opModeIsActive()) {
+//            Scheduler.tick()
+//            telemetry.update()
+//        }
+//        Scheduler.clear()
+//    }
+//}

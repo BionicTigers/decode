@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
-import android.view.MotionEvent
 import com.qualcomm.robotcore.hardware.ColorSensor
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
@@ -16,21 +15,19 @@ import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.robotcore.external.Telemetry
-import org.firstinspires.ftc.teamcode.control.DynamicPID
-import org.firstinspires.ftc.teamcode.control.GainSchedule
 import org.firstinspires.ftc.teamcode.control.MotionProfile
 import org.firstinspires.ftc.teamcode.control.MotionProfile.MotionResult
 import org.firstinspires.ftc.teamcode.control.PID
+import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
-import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -38,21 +35,42 @@ import kotlin.time.TimeSource
 
 class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Sorter"
+    override val dependencies = listOf(octoQuad)
 
     companion object {
-        val jerk = 3730
-        val maxAccel = 373070.9
+        val jerk = 15000
+        val maxAccel = 8690.9
         val maxVel =  2680.3023
+
+        private const val TICKS_PER_REV = 8192.0
+        private const val HOME_ANGLE_DEG = 20.0
+
+        private fun wrap360(deg: Double): Double {
+            val m = deg % 360.0
+            return if (m < 0) m + 360.0 else m
+        }
+
+        /** Signed smallest angular difference (deg) in [-180, 180]. */
+        private fun angleErrorDeg(targetDeg: Double, currentDeg: Double): Double {
+            return -Math.toDegrees(
+                atan2(
+                    sin(Math.toRadians(targetDeg - currentDeg)),
+                    cos(Math.toRadians(targetDeg - currentDeg))
+                )
+            )
+        }
     }
 
     var isOutput: Boolean = false
     var step: Int = 0
     var angle: Double = 0.0
+    private var angleUnwrapped: Double = 0.0
     var angleVel: Double = 0.0
     var maxVel: Double = 0.0
     var maxAccel: Double = 0.0
     var target: Double = 0.0
-    var ticks: Double = 0.0
+    private var lastLimitPressed: Boolean = false
+    @Editable var debugColorPrints: Boolean = false
 //    val pid: DynamicPID = DynamicPID(GainSchedule(
 //        mapOf(
 //            0.0 to .8, //8.0,
@@ -63,13 +81,21 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //        mapOf(0.0 to 0.0)
 //    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
     @Editable
-    val pid: PID = PID(1.5,0.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
+    val pid: PID = PID(0.7,0.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
+    @Editable var kS: Double = 0.01
+    @Editable var kV: Double = 0.0007
+    @Editable var kA: Double = 0.0
     @Editable
     val motionProfile: MotionProfile = MotionProfile(jerk,
         Companion.maxAccel,
         Companion.maxVel, 12.12)
     var currentProfile: MotionResult? = null
     var startTime: TimeMark? = null
+
+    var profileVelocity = 0.0
+    var profileAcceleration = 0.0
+    var junkTicks = octoQuad.encoderData.position[5]
+    private var profileDirection: Double = 1.0
 
     var error = 0.0
     var mpTarget = 0.0
@@ -103,26 +129,25 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         motor.direction = DcMotorSimple.Direction.REVERSE
         hub.setJunkTicks(3)
         pid.reset()
+
+//        octoQuad.octoQuad.channelBankConfig = OctoQuadFWv3.ChannelBankConfig.BANK1_QUADRATURE_BANK2_PULSE_WIDTH
+//        octoQuad.octoQuad.setSingleChannelPulseWidthParams(5, 1, 1024)
     }
 
     override val update = SystemCommand.continuous("Sorter Update") {
-        val oldAngle = angle
         val oldAngleVel = angleVel
 
         if (!limitSwitch.state) {
             angle = 20.0
         } else {
-            hub.refreshBulkData()
-//            val deltaTicks = hub.getEncoderTicks(3)
-            val deltaTicks = octoQuad.encoderData.position[5]
-            angle -= (deltaTicks / 8192.0) * 360.0
-            if (angle < 0) {
-                angle += 360.0
-            }
-            angle %= 360.0
-            hub.setJunkTicks()
+            val deltaTicks = octoQuad.encoderData.position[5] - junkTicks
+            val dt = it.deltaTime.seconds
+
+            val deltaAngle = -(deltaTicks / TICKS_PER_REV) * 360.0
+            angleUnwrapped += deltaAngle
+            angle = wrap360(angleUnwrapped)
+            angleVel = if (dt == 0.0) 0.0 else deltaAngle / dt
         }
-        angleVel = (angle - oldAngle)/it.deltaTime.seconds
 
         maxVel = max(angleVel, maxVel)
         maxAccel = max((angleVel - oldAngleVel)/it.deltaTime.seconds, maxAccel)
@@ -130,8 +155,9 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         telemetry?.addData("sorter max velocity", maxVel)
         telemetry?.addData("sorter max acceleration", maxAccel)
 
-        val isGreen = colorSensor.green() > 200
-        val isPurple = colorSensor.red() > 100 && colorSensor.blue() > 100
+//        val isGreen = colorSensor.green() > 200
+//        val isPurple = colorSensor.red() > 100 && colorSensor.blue() > 100
+        val (isGreen, isPurple) = Pair(false, false)
         telemetry?.addData("green", isGreen)
         telemetry?.addData("purple", isPurple)
 
@@ -144,37 +170,56 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //            colors[(step + 2) % 3] = BallColor.None
 //        }
 
-        if (isGreen)
-            println("Green")
-        else if (isPurple)
-            println("Purple")
-        else
-            println("Nothing!!")
+        if (debugColorPrints) {
+            if (isGreen) println("Green")
+            else if (isPurple) println("Purple")
+            else println("Nothing!!")
+        }
+
+        junkTicks = octoQuad.encoderData.position[5]
     }
 
-    override val apply = SystemCommand.continuous("Sorter Update") {
+    override val apply = SystemCommand.continuous("Sorter Apply") {
+        val limitPressed = false
 
-        if (currentProfile != null) {
-            mpTarget = currentProfile!!.getPosition(startTime!!.elapsedNow())
-            error = -Math.toDegrees(
-                atan2(
-                    sin(Math.toRadians(target - angle)),
-                    cos(Math.toRadians(target - angle))
+        if (limitPressed) {
+            motor.ePower = 0.0
+            telemetry?.addData("sorter homing", true)
+            return@continuous
+        }
+
+        val profile = currentProfile
+        val st = startTime
+        if (profile != null && st != null) {
+            val t = st.elapsedNow()
+            mpTarget = profile.getPosition(t)
+            // MotionProfile returns positive velocity/accel magnitudes for "inverse" (decreasing) moves.
+            // Apply the direction computed when we generated the profile.
+            profileVelocity = profile.getVelocity(t) * profileDirection
+            profileAcceleration = profile.getAcceleration(t) * profileDirection
+
+            val ff = -(
+                (kS * profileVelocity.sign) +
+                    (kV * profileVelocity) +
+                    (kA * profileAcceleration)
                 )
-            )
-            motor.ePower = -pid.compute(
-                error,
-                mpTarget
-            )
+
+            error = angleErrorDeg(target, angle)
+            val u = -pid.compute(error, mpTarget) + ff
+            motor.ePower = u.coerceIn(-1.0, 1.0)
+
+            telemetry?.addData("sorter ff", ff)
+        } else {
+            motor.ePower = 0.0
         }
 
 
-        if (kicker?.reset ?: false) {
-            if (!kicker.up)
-                motor.ePower -= .35
-            else
-                motor.ePower -= .35
-        }
+//        if (kicker?.reset ?: false) {
+//            if (!kicker.up)
+//                motor.ePower -= .35
+//            else
+//                motor.ePower -= .35
+//        }
 
         telemetry?.addData("step", step)
         telemetry?.addData("ticks from encoder", hub.getEncoderTicks(3))
@@ -185,56 +230,33 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
     fun outputPositionToggle() = SystemCommand.instant("toggle output positions") {
         isOutput = !isOutput
+        move()
+    }
+
+    fun move() {
+        when (step) {
+            0 -> target = 0.0
+            1 -> target = 120.0
+            2 -> target = 240.0
+        }
+        if (isOutput) {
+            target += 80 // check which position flips to output position
+        }
+        val error = angleErrorDeg(target, angle)
+        profileDirection = (-error).sign.takeIf { it != 0.0 } ?: 1.0
+        currentProfile = motionProfile.generate(error, 0)
+        startTime = TimeSource.Monotonic.markNow()
+        pid.reset()
     }
 
     fun moveForward() = SystemCommand.instant("sorter increment") {
         step = (step + 1) % 3
-        when (step) {
-            0 -> target = 0.0
-            1 -> target = 120.0
-            2 -> target = 240.0
-        }
-        if (isOutput) {
-            target += 80 // check which position flips to output position
-        }
-        val error = -Math.toDegrees(
-            atan2(
-                sin(Math.toRadians(target - angle)),
-                cos(Math.toRadians(target - angle))
-            )
-        )
-        currentProfile = motionProfile.generate(error, 0)
-        startTime = TimeSource.Monotonic.markNow()
-        pid.reset()
+        move()
     }
 
     fun moveBackward() = SystemCommand.instant("sorter decrement") {
         step = (step + 2) % 3
-        when (step) {
-            0 -> target = 0.0
-            1 -> target = 120.0
-            2 -> target = 240.0
-        }
-        if (isOutput) {
-            target += 80 // check which position flips to output position
-        }
-        val error = -Math.toDegrees(
-            atan2(
-                sin(Math.toRadians(target - angle)),
-                cos(Math.toRadians(target - angle))
-            )
-        )
-        currentProfile = motionProfile.generate(error, 0)
-        startTime = TimeSource.Monotonic.markNow()
-        pid.reset()
-    }
-
-    fun forward() = SystemCommand.instant("sorter forward") {
-        target = (ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 + 8192.0 / 3.0
-    }
-
-    fun backward() = SystemCommand.instant("sorter forward") {
-        target = (ticks / (8192.0 / 3.0)).roundToInt() * 8192.0 / 3.0 - 8192.0 / 3.0
+        move()
     }
 
     fun targetGreen() = SystemCommand.instant("target green") {
