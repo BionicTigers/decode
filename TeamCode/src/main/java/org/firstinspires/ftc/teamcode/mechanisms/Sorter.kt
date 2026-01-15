@@ -65,6 +65,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var step: Int = 0
     var angle: Double = 0.0
     private var angleUnwrapped: Double = 0.0
+    private var targetUnwrapped: Double = 0.0  // PID tracks this against angleUnwrapped
     var angleVel: Double = 0.0
     var maxVel: Double = 0.0
     var maxAccel: Double = 0.0
@@ -196,43 +197,18 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             return@continuous
         }
 
-        val profile = currentProfile
-        val st = startTime
-        if (profile != null && st != null) {
-            val t = st.elapsedNow()
-            mpTarget = profile.getPosition(t)
-            // MotionProfile returns positive velocity/accel magnitudes for "inverse" (decreasing) moves.
-            // Apply the direction computed when we generated the profile.
-            profileVelocity = profile.getVelocity(t) * profileDirection
-            profileAcceleration = profile.getAcceleration(t) * profileDirection
-
-            val ff = -(
-                (kS * profileVelocity.sign) +
-                    (kV * profileVelocity) +
-                    (kA * profileAcceleration)
-                )
-
-            error = angleErrorDeg(target, angle)
-            val u = -pid.compute(error, mpTarget) + ff
-            motor.ePower = u.coerceIn(-1.0, 1.0)
-
-            telemetry?.addData("sorter ff", ff)
-        } else {
-            motor.ePower = 0.0
-        }
-
-
-//        if (kicker?.reset ?: false) {
-//            if (!kicker.up)
-//                motor.ePower -= .35
-//            else
-//                motor.ePower -= .35
-//        }
+        // Simple PID using unwrapped angles - no clamping needed
+        // The target is set in move() to always be in the forward direction
+        error = angleUnwrapped - targetUnwrapped
+        val pidOutput = -pid.compute(error, 0.0)
+        
+        motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
 
         telemetry?.addData("step", step)
         telemetry?.addData("ticks from encoder", hub.getEncoderTicks(3))
         telemetry?.addData("angle", angle)
         telemetry?.addData("target", target)
+        telemetry?.addData("error", error)
         telemetry?.addData("power", motor.power)
     }
 
@@ -250,10 +226,18 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         if (isOutput) {
             target -= offset // ball in intake position flips to output position
         }
-        val error = angleErrorDeg(target, angle)
-        profileDirection = (-error).sign.takeIf { it != 0.0 } ?: 1.0
-        currentProfile = motionProfile.generate(error, 0)
-        startTime = TimeSource.Monotonic.markNow()
+        
+        // Set targetUnwrapped so we always go backward (increasing angle) for big moves
+        // angleErrorDeg: negative = target ahead (need to go backward/increase), positive = target behind (need to go forward/decrease)
+        val shortestError = angleErrorDeg(target, angle)
+        if (shortestError < 0) {
+            // Shortest path is backward (increasing) - use it
+            targetUnwrapped = angleUnwrapped - shortestError
+        } else {
+            // Shortest path is forward - go the long way backward instead
+            targetUnwrapped = angleUnwrapped + (360.0 - shortestError)
+        }
+        
         pid.reset()
     }
 

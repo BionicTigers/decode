@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
+import kotlin.math.abs
 import kotlin.math.min
 
 class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
@@ -35,20 +36,24 @@ class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Contro
     var velocity = RollingAverage(3)
     @Editable
     var targetVelocity = 1200.0
+    private val velocitySampleIntervalMs = 20
 
     @Editable
-    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 2700.0, 0.0, 1.0)
+    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 2700.0, -1.0, 1.0)
+    @Editable
+    var ff = .00075
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
         octoQuad.octoQuad.setSingleEncoderDirection(6, OctoQuadFWv3.EncoderDirection.FORWARD)
-        octoQuad.octoQuad.setSingleVelocitySampleInterval(6, 20)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(6, velocitySampleIntervalMs)
     }
 
     override val apply = SystemCommand.continuous("Intake After Run") {
-        velocity.plusAssign(octoQuad.encoderData.velocity[6] * 1000 / 20)
+        val ticksPerSec = octoQuad.encoderData.velocity[6] * 1000 / velocitySampleIntervalMs
+        velocity.plusAssign(ticksPerSec)
         if (active) {
-            motor.ePower = pid.compute(velocity.average, targetVelocity)
+            motor.ePower = (pid.compute(abs(velocity.average), targetVelocity) + ff * targetVelocity).coerceIn(-1.0, 1.0)
         }
     }
 
