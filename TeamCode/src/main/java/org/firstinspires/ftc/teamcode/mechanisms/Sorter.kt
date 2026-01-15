@@ -29,6 +29,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.withSign
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -82,7 +83,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //        mapOf(0.0 to 0.0)
 //    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
     @Editable
-    val pid: PID = PID(0.7,0.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
+    val pid: PID = PID(0.3,0.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
     @Editable var kS: Double = 0.01
     @Editable var kV: Double = 0.0007
     @Editable var kA: Double = 0.0
@@ -201,8 +202,12 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // The target is set in move() to always be in the forward direction
         error = angleUnwrapped - targetUnwrapped
         val pidOutput = -pid.compute(error, 0.0)
-        
-        motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
+
+        if (error > 5 || error < -5)
+            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
+        else
+            motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
+
 
         telemetry?.addData("step", step)
         telemetry?.addData("ticks from encoder", hub.getEncoderTicks(3))
