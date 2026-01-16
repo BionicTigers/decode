@@ -10,11 +10,18 @@ import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
+import io.github.bionictigers.axiom.core.web.Editable
+import org.firstinspires.ftc.teamcode.control.PID
+import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.RollingAverage
+import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
+import kotlin.math.abs
 import kotlin.math.min
 
-class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): System(), Controllable<BaseProfile> {
+class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
+    //ch 1
     override val name: String = "Intake"
 
     interface Schema : ControlSchema {
@@ -26,16 +33,27 @@ class Intake(hardwareMap: HardwareMap, val drivetrain: Drivetrain? = null): Syst
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
 
     var active: Boolean = false
-    var stillSpeed: Double = .7
+    var velocity = RollingAverage(3)
+    @Editable
+    var targetVelocity = 1200.0
+    private val velocitySampleIntervalMs = 20
+
+    @Editable
+    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 2700.0, -1.0, 1.0)
+    @Editable
+    var ff = .00075
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
+        octoQuad.octoQuad.setSingleEncoderDirection(6, OctoQuadFWv3.EncoderDirection.FORWARD)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(6, velocitySampleIntervalMs)
     }
 
     override val apply = SystemCommand.continuous("Intake After Run") {
+        val ticksPerSec = octoQuad.encoderData.velocity[6] * 1000 / velocitySampleIntervalMs
+        velocity.plusAssign(ticksPerSec)
         if (active) {
-            val power = stillSpeed + (drivetrain?.yControl ?: 1.0) * (1.0 - stillSpeed)
-            if (motor.power != power) motor.power = power
+            motor.ePower = (pid.compute(abs(velocity.average), targetVelocity) + ff * targetVelocity).coerceIn(-1.0, 1.0)
         }
     }
 

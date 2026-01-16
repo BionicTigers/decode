@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.control
 
+import io.github.bionictigers.axiom.core.web.Display
+import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.abs
 import kotlin.math.pow
@@ -8,12 +10,18 @@ import kotlin.math.sqrt
 import kotlin.time.Duration
 
 data class MotionProfile(
-    val jerk: Number,
-    val maxAcceleration: Number,
-    val maxVelocity: Number,
+    @Display @Editable var jerk: Number,
+    @Display @Editable var maxAcceleration: Number,
+    @Display @Editable var maxVelocity: Number,
     val voltageConstant: Number? = null,
     val points: Int = 600
 ) {
+    fun setConstants(jerk: Number, maxAcceleration: Number, maxVelocity: Double) {
+        this.jerk = jerk
+        this.maxAcceleration = maxAcceleration
+        this.maxVelocity = maxVelocity
+    }
+
     fun generate(start: Number, final: Number, startingVelocity: Number? = null) =
         generateMotionProfile(
             start.toDouble(),

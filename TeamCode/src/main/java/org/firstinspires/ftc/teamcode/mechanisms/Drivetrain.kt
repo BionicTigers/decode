@@ -41,7 +41,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odometry: Odometry? = null) : System(), Controllable<BaseProfile> {
+class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val odometry: Odometry? = null, val octoQuad: OctoQuad) : System(), Controllable<BaseProfile> {
     enum class DriveOrientation {
         /** Movement is relative to the robot */
         ROBOT,
@@ -57,6 +57,17 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
     }
 
     override val name = "Drivetrain"
+
+    var speedMultiplier = 1.0
+        set(value) {
+            xProfile.setConstants(xJerk * value, xMaxAcceleration * value, xMaxVelocity * value)
+            yProfile.setConstants(yJerk * value, yMaxAcceleration * value, yMaxVelocity * value)
+            angularProfile.setConstants(
+                angularJerk.radians * value,
+                angularMaxAcceleration.radians * value,
+                angularMaxVelocity.radians * value
+            )
+        }
 
     companion object {
         // TODO: test values and note units
@@ -102,8 +113,8 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     val motors = DriveMotors(hardwareMap)
 
-    //val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
-    val encoderData = OctoQuadFWv3.EncoderDataBlock()
+//    val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
+//    val encoderData = OctoQuadFWv3.EncoderDataBlock()
 
     val velocities = MotorValues(0.0, 0.0, 0.0, 0.0)
     val rollingAverages = MotorValues(
@@ -123,7 +134,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     var powers: MotorValues<Double> = MotorValues(0.0, 0.0, 0.0, 0.0)
 
-    override val dependencies: List<System> = listOfNotNull(odometry)
+    override val dependencies: List<System> = listOfNotNull(odometry, octoQuad)
 
     var max = 0.0
 
@@ -139,16 +150,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
             it.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
             it.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         }
-//        octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
-//        octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
-//        octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
-//        octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
-//
-//        octoQuad.setSingleVelocitySampleInterval(0, 10)
-//        octoQuad.setSingleVelocitySampleInterval(1, 10)
-//        octoQuad.setSingleVelocitySampleInterval(2, 10)
-//        octoQuad.setSingleVelocitySampleInterval(3, 10)
+        octoQuad.octoQuad.setSingleEncoderDirection(0, OctoQuadFWv3.EncoderDirection.REVERSE)
+        octoQuad.octoQuad.setSingleEncoderDirection(1, OctoQuadFWv3.EncoderDirection.FORWARD)
+        octoQuad.octoQuad.setSingleEncoderDirection(2, OctoQuadFWv3.EncoderDirection.REVERSE)
+        octoQuad.octoQuad.setSingleEncoderDirection(3, OctoQuadFWv3.EncoderDirection.FORWARD)
 
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(0, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(1, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(2, 10)
+        octoQuad.octoQuad.setSingleVelocitySampleInterval(3, 10)
     }
 
     override val update = SystemCommand.create("Motor Power Calculation") {
@@ -163,13 +173,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
 
         action {
-          //    octoQuad.readAllEncoderData(encoderData)
-            if (encoderData.crcOk) {
-                updateVelocities()
-            } else {
-                println("CRC not ok :(")
-                telemetry?.addLine("CRC not ok :(")
-            }
+            updateVelocities()
             if (inTeleop) {
                 // rotation pid
 //                if (odometry != null) {
@@ -229,9 +233,33 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    fun moveToPosition(target: Pose) = Command.create("Move to Position") {
+    override val apply = SystemCommand.continuous("Drivetrain Update") {
+        if (!inTeleop) {
+            if (mtp != null) {
+                with(mtp!!) {
+//                    println("pid calculated, ${it.deltaTime} loop time")
+                    powers.set(pids.calculatePowers(controlState))
+                    // TODO: add heading pid modifier
+
+                    telemetry?.addData("Error", errorState.printSimple())
+                    telemetry?.addData("Target Accelerations", controlState.printSimple())
+                    telemetry?.addData("pid", pids)
+                    telemetry?.addData("powers", powers)
+                }
+            } else {
+                powers.setAll(0.0) // TODO: figure out how to maintain position
+            }
+        }
+        motors.setPower(powers)
+    }
+
+    /**
+     * @param speed percentage of normal speed, 0 to 1
+     */
+    fun moveToPosition(target: Pose, speed: Double = 1.0) = Command.create("Move to Position") {
         enter {
             println("mtp")
+            speedMultiplier = speed
             val currentPose = Pose(odometry!!.position.x/1000, odometry.position.y/1000, odometry.position.radians)
             val targetPose = Pose(target.x/1000, target.y/1000, Angle.radians(target.radians))
             println(currentPose)
@@ -261,7 +289,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         action {
             if (mtp == null)
                 println("mtp stop")
-                stop()
+            stop()
         }
     }
 
@@ -292,25 +320,6 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         }
     }
 
-    override val apply = SystemCommand.continuous("Drivetrain Update") {
-        if (!inTeleop) {
-            if (mtp != null) {
-                with(mtp!!) {
-//                    println("pid calculated, ${it.deltaTime} loop time")
-                    powers.set(pids.calculatePowers(controlState))
-                    // TODO: add heading pid modifier
-
-//                    telemetry?.addData("Error", errorState.printSimple())
-//                    telemetry?.addData("Target Accelerations", controlState.printSimple())
-//                    telemetry?.addData("pid", pids)
-//                    telemetry?.addData("powers", powers)
-                }
-            } else {
-                powers.setAll(0.0) // TODO: figure out how to maintain position
-            }
-        }
-        motors.setPower(powers)
-    }
 
     fun largeChange(list:List<Double>, otherList: List<Double>): Boolean {
         list.forEachIndexed { index, num ->
@@ -325,7 +334,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
         with(pids) {
             val newMax = velocities.min()
             max = maxOf(max, newMax)
-          //  telemetry?.addData("Max Velocity", "$max, from ${motorNames[velocities.withIndex().minBy { it.value }.index]}")
+            telemetry?.addData("Max Velocity", "$max, from ${motorNames[velocities.withIndex().minBy { it.value }.index]}")
         }
     }
 
@@ -380,7 +389,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry?, val odomet
 
     fun updateVelocities() {
         rollingAverages.forEachIndexed { index, it ->
-            it += encoderData.velocities[index].toDouble() * 1/384.5 * 1000 // ticks/10ms to rev/s
+            it += octoQuad.encoderData.velocity[index].toDouble() * 1/384.5 * 1000 // ticks/10ms to rev/s
             velocities[index] = it.average
         }
     }

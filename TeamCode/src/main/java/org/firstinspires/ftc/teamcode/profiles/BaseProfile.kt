@@ -41,6 +41,7 @@ open class BaseProfile {
         override val purple = Digital.DPAD_RIGHT.press()
         override val openIntake = null
         override val openHuman = null
+        override val outputToggle = Digital.A.press()
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
