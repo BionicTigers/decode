@@ -54,7 +54,7 @@ class Kicker(hardwareMap: HardwareMap, val telemetry: Telemetry? = null): System
         reset = true
         kickedThisCycle = true
         up = false
-        time = 250.milliseconds
+        time = 320.milliseconds
         telemetry?.addLine("kicked")
         println("kicked")
     }

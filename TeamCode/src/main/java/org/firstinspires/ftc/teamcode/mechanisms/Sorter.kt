@@ -24,6 +24,7 @@ import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
@@ -83,7 +84,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //        mapOf(0.0 to 0.0)
 //    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
     @Editable
-    val pid: PID = PID(0.3,0.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
+    val pid: PID = PID(0.3,2.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
     @Editable var kS: Double = 0.01
     @Editable var kV: Double = 0.0007
     @Editable var kA: Double = 0.0
@@ -100,7 +101,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     private var profileDirection: Double = 1.0
 
     @Editable
-    var offset = 40
+    var offset = -20
 
     var error = 0.0
     var mpTarget = 0.0
@@ -201,12 +202,17 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // Simple PID using unwrapped angles - no clamping needed
         // The target is set in move() to always be in the forward direction
         error = angleUnwrapped - targetUnwrapped
-        val pidOutput = -pid.compute(error, 0.0)
+        var pidOutput = -pid.compute(error, 0.0)
+        val voltage = hub.getVoltage()
+        if (voltage < 12.0)
+            pidOutput += ((1.0 - hub.getVoltage() / 12.0 + .2) * .25).withSign(pidOutput)
 
-        if (error > 5 || error < -5)
+        if (abs(error) > 40)
+            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + (.02 / (40 - 5) * abs(error) + .05 ).withSign(pidOutput)
+        else if (abs(error) > 5)
             motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
         else
-            motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
+            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .04.withSign(pidOutput)
 
 
         telemetry?.addData("step", step)
@@ -235,7 +241,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // Set targetUnwrapped so we always go backward (increasing angle) for big moves
         // angleErrorDeg: negative = target ahead (need to go backward/increase), positive = target behind (need to go forward/decrease)
         val shortestError = angleErrorDeg(target, angle)
-        if (shortestError < 0) {
+        if (shortestError < 50) {
             // Shortest path is backward (increasing) - use it
             targetUnwrapped = angleUnwrapped - shortestError
         } else {
