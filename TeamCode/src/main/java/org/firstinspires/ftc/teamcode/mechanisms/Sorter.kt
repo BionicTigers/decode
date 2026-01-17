@@ -101,7 +101,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     private var profileDirection: Double = 1.0
 
     @Editable
-    var offset = -20
+    var offset = 80
 
     var error = 0.0
     var mpTarget = 0.0

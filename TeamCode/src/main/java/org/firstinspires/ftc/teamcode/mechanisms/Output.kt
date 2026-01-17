@@ -65,7 +65,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     @Editable
     var farTarget = 1650.0//1980.0
     @Editable
-    var closeTarget = 1400.0//1580.0
+    var closeTarget = 1500.0//1580.0
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
