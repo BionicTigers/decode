@@ -28,6 +28,8 @@ import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.max
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, val odometry: Odometry, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
@@ -50,6 +52,17 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         val aimRight: Digital
         val resetOdometry: Digital?
     }
+    var distance: Double = 0.0
+    var finalVeriticalVelocity: Double  = 0.0
+    var initialVerticalVelocity: Double = 0.0
+    val verticalAcceleration: Double = 9.81
+    var time: Double = 0.0
+    var initialHorizontalVelocity: Double = 0.0
+    var finalHorizontalVelocity: Double = 0.0
+    var wheelVelocity: Double = 0.0
+    var wheelSpeedVar: Double = 0.0
+    var c =
+
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     var angle = Angle.ZERO
@@ -75,6 +88,17 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     }
 
     override val update = SystemCommand.continuous("Output Data") {
+        distance = sqrt((3654.0 - odometry.position.x).pow(2)+(0 - odometry.position.y).pow(2))
+        finalVeriticalVelocity = sqrt(initialVerticalVelocity.pow(2) + 2 * verticalAcceleration * 15)
+        time = (finalVeriticalVelocity - initialVerticalVelocity) / verticalAcceleration
+
+        initialHorizontalVelocity = distance/time
+        initialHorizontalVelocity =  finalHorizontalVelocity
+
+        wheelVelocity = sqrt(finalHorizontalVelocity.pow(2)+ finalVeriticalVelocity.pow(2))
+        wheelSpeedVar = 2 * kotlin.math.PI * ((9.72 / 2.0) + 5/(9.72 / 2.0)) * wheelVelocity
+
+        rpm = (wheelSpeedVar / c) * 60/6000
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
         val lVel = (octoQuad.encoderData.position[4] - junkTicks) / it.deltaTime.seconds
         if (lVel.isFinite()) {
