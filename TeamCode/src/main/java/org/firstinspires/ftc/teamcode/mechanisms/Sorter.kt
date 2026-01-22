@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.DigitalChannel
 import com.qualcomm.robotcore.hardware.HardwareMap
+import com.qualcomm.robotcore.hardware.TouchSensor
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -74,6 +75,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var target: Double = 0.0
     private var lastLimitPressed: Boolean = false
     @Editable var debugColorPrints: Boolean = false
+    @Editable var static = 0.065
 //    val pid: DynamicPID = DynamicPID(GainSchedule(
 //        mapOf(
 //            0.0 to .8, //8.0,
@@ -84,7 +86,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //        mapOf(0.0 to 0.0)
 //    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
     @Editable
-    val pid: PID = PID(0.3,2.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
+    val pid: PID = PID(1.35,2.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
     @Editable var kS: Double = 0.01
     @Editable var kV: Double = 0.0007
     @Editable var kA: Double = 0.0
@@ -101,7 +103,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     private var profileDirection: Double = 1.0
 
     @Editable
-    var offset = -20
+    var offset = -25.0
 
     var error = 0.0
     var mpTarget = 0.0
@@ -128,7 +130,9 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     val motor = hardwareMap.getByName<DcMotorEx>("sorter")
     val hub = ControlHub(hardwareMap, "Control Hub")
     val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
-    val limitSwitch = hardwareMap.getByName<DigitalChannel>("limitSwitch")
+    val limitSwitch = hardwareMap.getByName<TouchSensor>("limitSwitch")
+
+    var previousState = false
 
     init {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
@@ -142,10 +146,15 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 
     override val update = SystemCommand.continuous("Sorter Update") {
         val oldAngleVel = angleVel
+//        println(limitSwitch.isPressed)
 
-        if (!limitSwitch.state) {
-            angle = 20.0
-        } else {
+//        if (!limitSwitch.isPressed && !previousState) {
+//            angle = 20.0
+//            angleUnwrapped = 20.0
+//            previousState = true
+//            println("pressing!!!! at $angle")
+//        } else {
+//            previousState = false
             val deltaTicks = octoQuad.encoderData.position[5] - junkTicks
             val dt = it.deltaTime.seconds
 
@@ -153,7 +162,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             angleUnwrapped += deltaAngle
             angle = wrap360(angleUnwrapped)
             angleVel = if (dt == 0.0) 0.0 else deltaAngle / dt
-        }
+//        }
 
         maxVel = max(angleVel, maxVel)
         maxAccel = max((angleVel - oldAngleVel)/it.deltaTime.seconds, maxAccel)
@@ -202,17 +211,19 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // Simple PID using unwrapped angles - no clamping needed
         // The target is set in move() to always be in the forward direction
         error = angleUnwrapped - targetUnwrapped
-        var pidOutput = -pid.compute(error, 0.0)
-        val voltage = hub.getVoltage()
-        if (voltage < 12.0)
-            pidOutput += ((1.0 - hub.getVoltage() / 12.0 + .2) * .25).withSign(pidOutput)
+        var pidOutput = -pid.compute(error, 0.0) + static
+//        val voltage = hub.getVoltage()
+//        if (voltage < 12.0)
+//            pidOutput += ((1.0 - hub.getVoltage() / 12.0 + .2) * .25).withSign(pidOutput)
 
-        if (abs(error) > 40)
-            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + (.02 / (40 - 5) * abs(error) + .05 ).withSign(pidOutput)
-        else if (abs(error) > 5)
-            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
-        else
-            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .04.withSign(pidOutput)
+//        if (abs(error) > 40)
+//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + (.02 / (40 - 5) * abs(error) + .05 ).withSign(pidOutput)
+//        else if (abs(error) > 5)
+//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
+//        else
+//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .04.withSign(pidOutput)
+
+        motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
 
 
         telemetry?.addData("step", step)
