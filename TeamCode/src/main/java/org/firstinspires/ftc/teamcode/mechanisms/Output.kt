@@ -61,7 +61,9 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var finalHorizontalVelocity: Double = 0.0
     var wheelVelocity: Double = 0.0
     var wheelSpeedVar: Double = 0.0
-    var c =
+    var c: Double = TODO()
+    var rpm: Double = 0.0
+
 
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
