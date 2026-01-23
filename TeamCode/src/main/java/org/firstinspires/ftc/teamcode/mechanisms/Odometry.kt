@@ -1,9 +1,12 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
+import com.qualcomm.hardware.bosch.BNO055IMU
 import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.System
 import org.firstinspires.ftc.robotcore.external.Telemetry
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D
 import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit
 import org.firstinspires.ftc.teamcode.drivers.GoBildaPinpointDriver
 import org.firstinspires.ftc.teamcode.utils.Angle
@@ -65,7 +68,7 @@ class Odometry(
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
         pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED)
             pinpoint.recalibrateIMU()
-        pinpoint.setPosition(startPose.toPose2D())
+        pinpoint.setPosition(Pose2D(DistanceUnit.MM,startPose.y, -startPose.x, AngleUnit.DEGREES, -startPose.degrees))
     }
 
     /**
@@ -93,10 +96,14 @@ class Odometry(
         log()
     }
 
+    fun setPose(newPose: Pose) {
+        pinpoint.setPosition(Pose2D(DistanceUnit.MM,newPose.y, -newPose.x, AngleUnit.DEGREES, -newPose.degrees))
+    }
+
     fun log() {
-//        telemetry?.addData("x", position.x)
-//        telemetry?.addData("y", position.y)
-//        telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
+        telemetry?.addData("x", position.x)
+        telemetry?.addData("y", position.y)
+        telemetry?.addData("rot", position.rotation.degrees.normalizeDegrees())
 //        telemetry?.addData("x vel", velocity.x)
 //        telemetry?.addData("y vel", velocity.y)
 //        telemetry?.addData("rot vel", velocity.rotation.degrees.normalizeDegrees())

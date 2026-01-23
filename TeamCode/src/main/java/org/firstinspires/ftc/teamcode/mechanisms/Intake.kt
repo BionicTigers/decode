@@ -35,7 +35,7 @@ class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Contro
     var active: Boolean = false
     var velocity = RollingAverage(3)
     @Editable
-    var targetVelocity = 1200.0
+    var targetVelocity = 1600.0
     private val velocitySampleIntervalMs = 20
 
     @Editable

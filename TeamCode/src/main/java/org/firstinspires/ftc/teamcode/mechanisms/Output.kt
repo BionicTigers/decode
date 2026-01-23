@@ -18,15 +18,18 @@ import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.ControlHub
+import org.firstinspires.ftc.teamcode.utils.Distance
+import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.eq
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
+import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.max
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, odometry: Odometry, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, val odometry: Odometry, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
     override val dependencies = listOf(octoQuad)
     // encoder on octoQuad 4
@@ -45,15 +48,13 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         val toggleSlow: Digital?
         val aimLeft: Digital
         val aimRight: Digital
+        val resetOdometry: Digital?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     var angle = Angle.ZERO
-    var tagAngle = 0.0
 
     var currentVel = 0.0
-
-    var robotAngle = 0.0
     var targetAngle = angle.degrees - 1
 
     val indcLight = hardwareMap.getByName<Servo>("indcLight")
@@ -63,24 +64,19 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var junkTicks = octoQuad.encoderData.position[4]
 
     @Editable
-    var farTarget = 1650.0//1980.0
+    var farTarget = 1625.0//1980.0
     @Editable
-    var closeTarget = 1500.0//1580.0
+    var closeTarget = 1430.0//1580.0
 
     init {
         motor.direction = DcMotorSimple.Direction.REVERSE
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.FLOAT
         motor.mode == DcMotor.RunMode.RUN_WITHOUT_ENCODER
     }
-    companion object {
-
-    }
 
     override val update = SystemCommand.continuous("Output Data") {
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
         val lVel = (octoQuad.encoderData.position[4] - junkTicks) / it.deltaTime.seconds
-        tagAngle = atan2((36.54 - odometry.position.y),(0 - odometry.position.x)) + 180
-        robotAngle = atan2(odometry.position.y, odometry.position.x)
         if (lVel.isFinite()) {
             velocity.plusAssign(lVel)
         }
@@ -114,9 +110,37 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         junkTicks = octoQuad.encoderData.position[4]
     }
 
-    override val apply = SystemCommand.continuous ("output data") {
-        var turnAngle = tagAngle + robotAngle
-        turret.position = turnAngle / 45
+    override val apply = SystemCommand.continuous("Turret Auto Aim") {
+//        // Static target position in mm
+        val targetX = 3352.8 + 300
+        val targetY = 0
+
+        // Calculate angle from robot to target in field coordinates
+        // Using atan2(deltaX, deltaY) because robot heading 0° = positive Y, 90° = positive X
+        val deltaX = targetX - odometry.position.x
+        val deltaY = targetY - odometry.position.y
+        val angleToTarget = atan2(deltaX, deltaY) // radians
+
+        // Get robot's current heading in radians
+        val robotHeading = odometry.position.radians
+
+        // Calculate relative angle (how much turret needs to turn from robot's forward direction)
+        var relativeAngle = angleToTarget - robotHeading
+
+        // Normalize to [-π, π] so turret takes the shortest path
+        while (relativeAngle > PI) relativeAngle -= 2 * PI
+        while (relativeAngle < -PI) relativeAngle += 2 * PI
+
+        // Convert to servo position
+        // At 0.5, turret is aligned with robot's forward direction (0 relative angle)
+        // 90° servo range: -45° (servo 0.0) to +45° (servo 1.0)
+        val servoPosition = (0.5 - ((relativeAngle) / (PI / 3))).coerceIn(0.1, 0.9)
+
+        telemetry?.addData("Angle", Math.toDegrees(relativeAngle))
+        telemetry?.addData("Servo Position", servoPosition)
+
+        turret.position = servoPosition
+//        turret.position = 0.5
     }
 
     fun shoot() = SystemCommand.instant("Output Enable") {
@@ -145,6 +169,10 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         turret.position += -.1
     }
 
+    fun resetOdometry() = SystemCommand.instant("Reset Odometry") {
+        odometry.setPose(Pose(609.6 * 6 - Distance.inch(9).mm / 2, 609.6 * 3, 270))
+    }
+
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
         with(profile.output) {
             if (!desiredGamepad.matches(gamepad)) return
@@ -155,6 +183,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             toggleSlow?.let { builder.register(it) { if (active && targetVelocity == closeTarget) stop() else shootClose() } }
             aimLeft?.let { builder.register(it) { turnLeft() } }
             aimRight?.let { builder.register(it) { turnRight() } }
+            resetOdometry?.let { builder.register(it) { resetOdometry() } }
         }
     }
 }

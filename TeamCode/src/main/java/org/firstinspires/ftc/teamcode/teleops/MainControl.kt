@@ -21,13 +21,13 @@ import kotlin.time.measureTime
 class MainControl : LinearOpMode() {
     override fun runOpMode() {
         val b = TimeSource.Monotonic.markNow()
-        val odometry = Odometry(hardwareMap, null, Pose(0, 0, 0))
-        val octoquad = OctoQuad(hardwareMap, telemetry)
+        val odometry = Odometry(hardwareMap, null, Pose(609.6 * 6 - 609.6 * (4/5), 609.6, 270))
+        val octoquad = OctoQuad(hardwareMap, null)
         val drivetrain = Drivetrain(hardwareMap, null, odometry, octoquad)
         val intake = Intake(hardwareMap, octoquad)
         val kicker = Kicker(hardwareMap)
-        val sorter = Sorter(hardwareMap, kicker, null, octoquad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoquad)
+        val sorter = Sorter(hardwareMap, kicker, telemetry, octoquad)
+        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )
