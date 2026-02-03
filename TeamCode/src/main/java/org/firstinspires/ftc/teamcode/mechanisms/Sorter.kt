@@ -75,7 +75,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     var target: Double = 0.0
     private var lastLimitPressed: Boolean = false
     @Editable var debugColorPrints: Boolean = false
-    @Editable var static = 0.065
+    @Editable var static = 0.15
 //    val pid: DynamicPID = DynamicPID(GainSchedule(
 //        mapOf(
 //            0.0 to .8, //8.0,
@@ -211,7 +211,13 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // Simple PID using unwrapped angles - no clamping needed
         // The target is set in move() to always be in the forward direction
         error = angleUnwrapped - targetUnwrapped
-        var pidOutput = -pid.compute(error, 0.0) + static
+        var pidOutput = if (error > 10) {
+            -pid.compute(error, 0.0) + static
+        } else {
+            -pid.compute(error, 0.0)
+        }
+            motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
+
 //        val voltage = hub.getVoltage()
 //        if (voltage < 12.0)
 //            pidOutput += ((1.0 - hub.getVoltage() / 12.0 + .2) * .25).withSign(pidOutput)
@@ -222,8 +228,6 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
 //            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
 //        else
 //            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .04.withSign(pidOutput)
-
-        motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
 
 
         telemetry?.addData("step", step)
@@ -252,14 +256,15 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         // Set targetUnwrapped so we always go backward (increasing angle) for big moves
         // angleErrorDeg: negative = target ahead (need to go backward/increase), positive = target behind (need to go forward/decrease)
         val shortestError = angleErrorDeg(target, angle)
-        if (shortestError < 50) {
-            // Shortest path is backward (increasing) - use it
-            targetUnwrapped = angleUnwrapped - shortestError
-        } else {
-            // Shortest path is forward - go the long way backward instead
-            targetUnwrapped = angleUnwrapped + (360.0 - shortestError)
-        }
-        
+//        if (shortestError < 50) {
+//            // Shortest path is backward (increasing) - use it
+//            targetUnwrapped = angleUnwrapped - shortestError
+//        } else {
+//            // Shortest path is forward - go the long way backward instead
+//            targetUnwrapped = angleUnwrapped + (360.0 - shortestError)
+//        }
+        targetUnwrapped = angleUnwrapped - shortestError
+
         pid.reset()
     }
 

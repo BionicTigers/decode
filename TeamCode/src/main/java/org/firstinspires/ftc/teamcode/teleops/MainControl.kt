@@ -27,7 +27,7 @@ class MainControl : LinearOpMode() {
         val intake = Intake(hardwareMap, octoquad)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoquad)
-        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad)
+        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad, false)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )
