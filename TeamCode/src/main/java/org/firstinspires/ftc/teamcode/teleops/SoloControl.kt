@@ -25,7 +25,7 @@ class SoloControl : LinearOpMode() {
         val intake = Intake(hardwareMap, octoQuad)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad)
+        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
         val controls = Controls(gamepad1, gamepad1, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )

@@ -25,7 +25,7 @@ class BlueFarr: LinearOpMode() {
         val intake = Intake(hardwareMap, octoQuad)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad)
+        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
 
         Scheduler.schedule(odometry, drivetrain, intake, kicker, sorter, output)
 
