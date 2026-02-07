@@ -52,6 +52,7 @@ class Odometry(
 
     var position = startPose
     var velocity = Pose(0.0, 0.0, 0.0)
+    var fielaVelocity = Pose(0.0, 0.0, 0.0)
     var state = Matrix(
         arrayOf(
             arrayOf(position.x),
@@ -88,7 +89,7 @@ class Odometry(
             -Angle.radians(pinpoint.getHeading(UnnormalizedAngleUnit.RADIANS))
         )
 
-        velocity = Pose(
+        velocity = Pose( // values are global
             -pinpoint.getVelY(DistanceUnit.MM),
             pinpoint.getVelX(DistanceUnit.MM),
             -Angle.radians(pinpoint.getHeadingVelocity(UnnormalizedAngleUnit.RADIANS))
