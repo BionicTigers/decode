@@ -1,27 +1,20 @@
 package org.firstinspires.ftc.teamcode.control
 
-import io.github.bionictigers.axiom.core.web.Display
-import io.github.bionictigers.axiom.core.web.Editable
 import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sqrt
 import kotlin.time.Duration
 
 data class MotionProfile(
-    @Display @Editable var jerk: Number,
-    @Display @Editable var maxAcceleration: Number,
-    @Display @Editable var maxVelocity: Number,
+    var jerk: Number,
+    var maxAcceleration: Number,
+    var maxVelocity: Number,
     val voltageConstant: Number? = null,
     val points: Int = 600
 ) {
-    fun setConstants(jerk: Number, maxAcceleration: Number, maxVelocity: Double) {
-        this.jerk = jerk
-        this.maxAcceleration = maxAcceleration
-        this.maxVelocity = maxVelocity
-    }
-
     fun generate(start: Number, final: Number, startingVelocity: Number? = null) =
         generateMotionProfile(
             start.toDouble(),
@@ -47,27 +40,33 @@ data class MotionProfile(
         )
     }
 
-    private fun adjustForVoltage(value: Number, voltage: Number): Double = value.toDouble() * voltageConstant!!.toDouble() / voltage.toDouble()
+    fun setConstants(jerk: Number, maxAcceleration: Number, maxVelocity: Number) {
+        this.jerk = jerk
+        this.maxAcceleration = maxAcceleration
+        this.maxVelocity = maxVelocity
+    }
 
-    data class MotionResult(
-        val acceleration: List<Double>,
-        val velocity: List<Double>,
-        val position: List<Double>,
-        val time: List<Double>,
-        val deltaTime: Double,
-        private val target: Double
-    ) {
-        fun getPosition(time: Duration): Double {
-            return position.getOrElse((time.seconds / deltaTime).toInt()) {position.last()}
-        }
+    fun adjustForVoltage(value: Number, voltage: Number): Double = value.toDouble() * voltageConstant!!.toDouble() / voltage.toDouble()
+}
 
-        fun getAcceleration(time: Duration): Double {
-            return acceleration.getOrElse((time.seconds / deltaTime).toInt()) {acceleration.last()}
-        }
+data class MotionResult(
+    val acceleration: List<Double>,
+    val velocity: List<Double>,
+    val position: List<Double>,
+    val time: List<Double>,
+    val deltaTime: Double,
+    private val target: Double
+) {
+    fun getPosition(time: Duration): Double {
+        return position.getOrElse((time.seconds / deltaTime).toInt()) {position.last()}
+    }
 
-        fun getVelocity(time: Duration): Double {
-            return velocity.getOrElse((time.seconds / deltaTime).toInt()) {velocity.last()}
-        }
+    fun getAcceleration(time: Duration): Double {
+        return acceleration.getOrElse((time.seconds / deltaTime).toInt()) {acceleration.last()}
+    }
+
+    fun getVelocity(time: Duration): Double {
+        return velocity.getOrElse((time.seconds / deltaTime).toInt()) {velocity.last()}
     }
 }
 
@@ -78,7 +77,7 @@ data class MotionProfile(
  * @param maxAcceleration mm/s^2
  * @param maxVelocity mm/s
  */
-private fun generateMotionProfile(
+fun generateMotionProfile(
     s: Double,
     f: Double,
     jerk: Double,
@@ -86,7 +85,7 @@ private fun generateMotionProfile(
     maxVelocity: Double,
     startingVelocity: Double? = null,
     points: Int = 600
-): MotionProfile.MotionResult {
+): MotionResult {
     var start = s
     var final = f
     var v0: Double? = startingVelocity
@@ -103,7 +102,7 @@ private fun generateMotionProfile(
         final = s
     }
 
-    if (final - start == 0.0) return MotionProfile.MotionResult(
+    if (final - start == 0.0) return MotionResult(
         listOf(0.0),
         listOf(0.0),
         listOf(start),
@@ -335,6 +334,14 @@ private fun generateMotionProfile(
         t7 = t6 + t1
     }
 
+    val aHold = when {
+        (va > vMax && sa < target) || (va > vMax && sa > target && sv < target) ||
+                (va < vMax && sa > target) || (va > vMax && sa > target && sv > target) -> jerk * t1
+
+        else -> maxAcceleration
+    }
+
+
     val timeslice = t7 / points
 //
 //    println("$p1 $p2 $p3 $p4 $p5 $p6 $target")
@@ -348,16 +355,21 @@ private fun generateMotionProfile(
     println("t0: $t0, t7: $t7")
     for (i in 0..<points) {
         val time = t0 + timeslice * i
-        if (time < t1) acceleration[i] = acceleration.getOrElse(i - 1) { 0.0 } + jerk * timeslice
-        else if (time < t2) acceleration[i] = acceleration.getOrElse(i - 1) { a0 }
-        else if (time < t3) acceleration[i] = acceleration.getOrElse(i - 1) { a0 } - jerk * timeslice
-        else if (time < t4) acceleration[i] = 0.0
-        else if (time < t5) acceleration[i] = acceleration.getOrElse(i - 1) { a0 } - jerk * timeslice
-        else if (time < t6) acceleration[i] = acceleration.getOrElse(i - 1) { a0 }
-        else acceleration[i] = acceleration.getOrElse(i - 1) { a0 } + jerk * timeslice
+        val a = when {
+            time < t1 -> jerk * (time - t0)
+            time < t2 -> aHold
+            time < t3 -> aHold - jerk * (time - t2)
+            time < t4 -> 0.0
+            time < t5 -> -jerk * (time - t4)
+            time < t6 -> -aHold
+            time < t7 -> -aHold + jerk * (time - t6)
+            else -> 0.0
+        }
 
-        velocity[i] = velocity.getOrElse(i - 1) { 0.0 } + acceleration[i] * timeslice
-        position[i] = position.getOrElse(i - 1) { 0.0 } + velocity[i] * timeslice
+        val prevVelocity = velocity.getOrElse(i - 1) { v0 }
+        acceleration[i] = a
+        velocity[i] = prevVelocity + acceleration[i] * timeslice
+        position[i] = position.getOrElse(i - 1) { 0.0 } + (prevVelocity + velocity[i]) * .5 * timeslice
         timeList[i] = time
         if (position[i] >= final - start || time >= t7) {
             position.trimZeros()
@@ -366,6 +378,14 @@ private fun generateMotionProfile(
             acceleration.trimZeros()
             break
         }
+    }
+
+    if (timeList.isNotEmpty()) {
+        val last = timeList.lastIndex
+        acceleration[last] = 0.0
+        velocity[last] = 0.0
+        position[last] = (final - start)
+        timeList[last] = t7
     }
 
     for (i in 0..<position.size) {
@@ -378,21 +398,14 @@ private fun generateMotionProfile(
         position.reverse()
     }
 
-    return MotionProfile.MotionResult(acceleration, velocity, position, timeList, timeslice, final)
+    return MotionResult(acceleration, velocity, position, timeList, timeslice, final)
 }
 
-private fun <T> ArrayList<T>.trimZeros() {
-    var i = 0
-    while (i < this.size) {
-        if (this[i] == 0.0) {
-            this.removeAt(i)
-        } else {
-            i++
-        }
-    }
+fun <T> ArrayList<T>.trimZeros() {
+    while (isNotEmpty() && last() == 0.0) removeAt(size - 1)
 }
 
-private fun <T> ArrayList(points: Int, function: () -> T): ArrayList<T> {
+fun <T> ArrayList(points: Int, function: () -> T): ArrayList<T> {
     val array = ArrayList<T>(points)
     for (i in 0..<points) {
         array.add(function())
