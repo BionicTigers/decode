@@ -106,6 +106,10 @@ class Matrix(val value: Array<Array<Double>>) {
         }
         return string
     }
+
+    fun asLists(): List<List<Double>> {
+        TODO()
+    }
 }
 
 fun emptyMatrix(): Matrix {

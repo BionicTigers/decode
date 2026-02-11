@@ -103,7 +103,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     private var profileDirection: Double = 1.0
 
     @Editable
-    var offset = -25.0
+    var offset = -45.0
 
     var error = 0.0
     var mpTarget = 0.0
@@ -130,7 +130,7 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     val motor = hardwareMap.getByName<DcMotorEx>("sorter")
     val hub = ControlHub(hardwareMap, "Control Hub")
     val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
-    val limitSwitch = hardwareMap.getByName<TouchSensor>("limitSwitch")
+//    val limitSwitch = hardwareMap.getByName<TouchSensor>("limitSwitch")
 
     var previousState = false
 

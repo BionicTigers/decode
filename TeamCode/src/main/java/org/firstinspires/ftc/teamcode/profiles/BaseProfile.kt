@@ -25,7 +25,7 @@ open class BaseProfile {
         override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
-    val output = object : Output.Schema {
+    open val output = object : Output.Schema {
         override val shoot = null
         override val stop = null
         override val toggle = Digital.Y.press()
@@ -33,11 +33,14 @@ open class BaseProfile {
         override val aimLeft: Digital = Digital.DPAD_LEFT.press()
         override val aimRight: Digital = Digital.DPAD_RIGHT.press()
         override val resetOdometry: Digital = Digital.DPAD_UP.press()
-
+        override val incVel: Digital? = null
+        override val decVel: Digital? = null
+        override val smallIncVel: Digital? = null
+        override val smallDecVel: Digital? = null
         override val desiredGamepad = Gamepads.GAMEPAD_1 // change back to 2 before comp
     }
 
-    val sorter = object : Sorter.Schema {
+    open val sorter = object : Sorter.Schema {
         override val forward = Digital.RIGHT_BUMPER.press()
         override val backward = Digital.LEFT_BUMPER.press()
         override val green = Digital.DPAD_LEFT.press()
@@ -48,7 +51,7 @@ open class BaseProfile {
         override val desiredGamepad = Gamepads.GAMEPAD_2
     }
 
-    val kicker = object : Kicker.Schema {
+    open val kicker = object : Kicker.Schema {
         override val kick : Digital = Digital.X.press()
         override val up : Digital = Digital.DPAD_UP.press()
         override val down: Digital = Digital.DPAD_DOWN.press()
