@@ -16,6 +16,7 @@ import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import io.github.bionictigers.axiom.core.web.WebData
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
+import org.firstinspires.ftc.teamcode.control.MotionResult
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
@@ -713,9 +714,9 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
     data class MoveVariables(
         var finalPose: Pose,
         var targetPose: Pose,
-        var xResult: MotionProfile.MotionResult,
-        var yResult: MotionProfile.MotionResult,
-        var angularResult: MotionProfile.MotionResult,
+        var xResult: MotionResult,
+        var yResult: MotionResult,
+        var angularResult: MotionResult,
         var startTime: TimeMark,
         var errorState: Matrix,
         var controlState: Matrix,

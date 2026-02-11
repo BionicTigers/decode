@@ -48,7 +48,6 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var targetVelocity: Double = 0.0
     @Editable
     val pid: PID = PID(2.0, 2.0, 0.0, 1.0, 0.0, 2700.0, 0.0, 1.0)
-    var maxVelocity: Double = 0.0
 
     interface Schema : ControlSchema {
         val shoot: Digital?
@@ -87,16 +86,21 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // distance from red/blueGoalPos to the wall of the goal at their closest point, in mm
     val k = 464.5
 
-    val ballToWheelVel = interpolatedMapOf(
-        1894.845639 to 500.0,
-        3406.043328 to 1000.0,
-        3914.481296 to 1100.0,
-        4414.634545 to 1200.0,
-        4769.74576 to 1300.0,
-        5301.269619 to 1400.0,
-        5378.976959 to 1500.0,
-        5468.872693 to 1600.0,
-        5873.160028 to 1700.0
+    // val ballToWheelVel = interpolatedMapOf(
+    //     1894.845639 to 500.0,
+    //     3406.043328 to 1000.0,
+    //     3914.481296 to 1100.0,
+    //     4414.634545 to 1200.0,
+    //     4769.74576 to 1300.0,
+    //     5301.269619 to 1400.0,
+    //     5378.976959 to 1500.0,
+    //     5468.872693 to 1600.0,
+    //     5873.160028 to 1700.0
+    // )
+
+    val velocityMap = interpolatedMapOf(
+        3600.0 to 1625.0,
+        2042.0 to 1430.0
     )
 
     @Editable
@@ -150,11 +154,12 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
                 )
 
                 val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+                targetVelocity = velocityMap[distToGoalWall]
                 telemetry?.addData("distToGoalWall", distToGoalWall)
                 telemetry?.addData("last shot vel", velocity.average)
             } else {
                 val error = targetVelocity - velocity.average
-                val rampPower = if (error > 100) 1.0 else 0.0
+                val rampPower = if (error > 400) 1.0 else 0.0
                 motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
             }
         } else {
@@ -241,56 +246,56 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         return if (g0 <= g1) a else b
     }
 
-    fun calculateShooterVel() : Double? {
-        val currentPos = odometry!!.position
-        val goalPos = if (isRed) redGoalPos else blueGoalPos
-        val kDrag = 0.168 // stupid ball is slowed down by air too much, this was calculated using the ratio of the old far and close shot values
-        val p = 1.05
-
-//        val distFromGoal = sqrt((currentPos.x - goalPos.x).pow(2) + (currentPos.y - goalPos.y).pow(2))
-//        // account for differences in goal distance at different angles, since the goal is triangular
-//        val distToGoalWall = distFromGoal - ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) )
-//        telemetry?.addData("thing", ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) ))
-
-        val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
-        val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
-        val closestPoint = closestPointOnLineSegment(
-            goalPointA,
-            goalPointB,
-            currentPos.position
-        )
-
-        val distToGoalWall = (currentPos.position - closestPoint).magnitude()
-        telemetry?.addData("distToGoalWall", distToGoalWall)
-        telemetry?.addData("closestPoint", closestPoint.toString())
-
-
-        // the desired height of the ball when it passes over the goal wall, height of goal + 5in, in mm
-        val heightAtWall = 984.5 + 127
-
-        val ballVelocity = if (distToGoalWall * tan(rampAngle.radians) + shooterHeight - kDrag * distToGoalWall > heightAtWall) {
-            // all units must be in mm , including gravity
-            sqrt( (distToGoalWall.pow(2) * 9800) /
-                    ( 2 * cos(rampAngle.radians).pow(2) * (distToGoalWall * tan(rampAngle.radians) + shooterHeight - heightAtWall - kDrag * distToGoalWall.pow(p)) ) )
-        } else {
-            return null // if the statement is false, the shot is impossible at the current ramp angle and field position
-        }
-        telemetry?.addData("ball vel", ballVelocity)
-        // ball velocity is in 3d, we need to project it to 2d x and y to adjust for robot movement before converting back
-        val projBallVel = ballVelocity * cos(rampAngle.radians)
-
-        val shotAngle = atan2(goalPos.y - currentPos.y, goalPos.x - currentPos.x)
-        val adjusted2dBallVel =
-            sqrt((projBallVel * cos(shotAngle) - odometry.velocity.x).pow(2)
-                    + (projBallVel * sin(shotAngle) - odometry.velocity.y).pow(2))
-        // convert back to 3d
-        val adjustedBallVel = sqrt( adjusted2dBallVel.pow(2) + (ballVelocity * sin(rampAngle.radians)).pow(2) )
-
-        telemetry?.addData("adjustedBallVel", adjustedBallVel)
-        telemetry?.addData("friction", ballToWheelVel[adjustedBallVel])
-
-        return ballToWheelVel[adjustedBallVel]
-    }
+//    fun calculateShooterVel() : Double? {
+//        val currentPos = odometry!!.position
+//        val goalPos = if (isRed) redGoalPos else blueGoalPos
+//        val kDrag = 0.168 // stupid ball is slowed down by air too much, this was calculated using the ratio of the old far and close shot values
+//        val p = 1.05
+//
+////        val distFromGoal = sqrt((currentPos.x - goalPos.x).pow(2) + (currentPos.y - goalPos.y).pow(2))
+////        // account for differences in goal distance at different angles, since the goal is triangular
+////        val distToGoalWall = distFromGoal - ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) )
+////        telemetry?.addData("thing", ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) ))
+//
+//        val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
+//        val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
+//        val closestPoint = closestPointOnLineSegment(
+//            goalPointA,
+//            goalPointB,
+//            currentPos.position
+//        )
+//
+//        val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+//        telemetry?.addData("distToGoalWall", distToGoalWall)
+//        telemetry?.addData("closestPoint", closestPoint.toString())
+//
+//
+//        // the desired height of the ball when it passes over the goal wall, height of goal + 5in, in mm
+//        val heightAtWall = 984.5 + 127
+//
+//        val ballVelocity = if (distToGoalWall * tan(rampAngle.radians) + shooterHeight - kDrag * distToGoalWall > heightAtWall) {
+//            // all units must be in mm , including gravity
+//            sqrt( (distToGoalWall.pow(2) * 9800) /
+//                    ( 2 * cos(rampAngle.radians).pow(2) * (distToGoalWall * tan(rampAngle.radians) + shooterHeight - heightAtWall - kDrag * distToGoalWall.pow(p)) ) )
+//        } else {
+//            return null // if the statement is false, the shot is impossible at the current ramp angle and field position
+//        }
+//        telemetry?.addData("ball vel", ballVelocity)
+//        // ball velocity is in 3d, we need to project it to 2d x and y to adjust for robot movement before converting back
+//        val projBallVel = ballVelocity * cos(rampAngle.radians)
+//
+//        val shotAngle = atan2(goalPos.y - currentPos.y, goalPos.x - currentPos.x)
+//        val adjusted2dBallVel =
+//            sqrt((projBallVel * cos(shotAngle) - odometry.velocity.x).pow(2)
+//                    + (projBallVel * sin(shotAngle) - odometry.velocity.y).pow(2))
+//        // convert back to 3d
+//        val adjustedBallVel = sqrt( adjusted2dBallVel.pow(2) + (ballVelocity * sin(rampAngle.radians)).pow(2) )
+//
+//        telemetry?.addData("adjustedBallVel", adjustedBallVel)
+//        telemetry?.addData("friction", ballToWheelVel[adjustedBallVel])
+//
+//        return ballToWheelVel[adjustedBallVel]
+//    }
 
     fun shoot() = SystemCommand.instant("Output Enable Far Target") {
 //        motor.power = .83
