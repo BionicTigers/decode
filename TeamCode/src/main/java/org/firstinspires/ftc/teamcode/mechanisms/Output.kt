@@ -22,9 +22,11 @@ import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.InterpolatedMap
 import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
+import org.firstinspires.ftc.teamcode.utils.Vector2
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.eq
 import org.firstinspires.ftc.teamcode.utils.getByName
+import org.firstinspires.ftc.teamcode.utils.interpolatedMapOf
 import org.firstinspires.ftc.teamcode.utils.milliseconds
 import org.firstinspires.ftc.teamcode.utils.seconds
 import kotlin.math.PI
@@ -36,7 +38,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, telemetry: Telemetry? = null, val odometry: Odometry, octoQuad: OctoQuad, val isRed: Boolean): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, val telemetry: Telemetry? = null, val odometry: Odometry?, octoQuad: OctoQuad, val isRed: Boolean): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
     override val dependencies = listOf(octoQuad)
     // encoder on octoQuad 4
@@ -46,15 +48,18 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var targetVelocity: Double = 0.0
     @Editable
     val pid: PID = PID(2.0, 2.0, 0.0, 1.0, 0.0, 2700.0, 0.0, 1.0)
-    var maxVelocity: Double = 0.0
 
     interface Schema : ControlSchema {
         val shoot: Digital?
         val stop: Digital?
         val toggle: Digital?
         val toggleSlow: Digital?
-        val aimLeft: Digital
-        val aimRight: Digital
+        val incVel: Digital?
+        val decVel: Digital?
+        val smallIncVel: Digital?
+        val smallDecVel: Digital?
+        val aimLeft: Digital?
+        val aimRight: Digital?
         val resetOdometry: Digital?
     }
 
@@ -76,13 +81,26 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     val shooterHeight = 255.2 // must be in mm
 
     // at the corners of the field
-    val redGoalPos = Pose(0.0,3657.6, 0.0)
+    val redGoalPos = Pose(3657.6,0.0, 0.0)
     val blueGoalPos = Pose(3657.6,3657.6, 0.0)
     // distance from red/blueGoalPos to the wall of the goal at their closest point, in mm
     val k = 464.5
 
-    val ballToWheelVel = InterpolatedMap(
-        // TODO
+    // val ballToWheelVel = interpolatedMapOf(
+    //     1894.845639 to 500.0,
+    //     3406.043328 to 1000.0,
+    //     3914.481296 to 1100.0,
+    //     4414.634545 to 1200.0,
+    //     4769.74576 to 1300.0,
+    //     5301.269619 to 1400.0,
+    //     5378.976959 to 1500.0,
+    //     5468.872693 to 1600.0,
+    //     5873.160028 to 1700.0
+    // )
+
+    val velocityMap = interpolatedMapOf(
+        3600.0 to 1980.0,
+        2042.0 to 1750.0
     )
 
     @Editable
@@ -104,28 +122,50 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             velocity.plusAssign(lVel)
         }
 
-        val autoVelocity = calculateShooterVel()
-        if (autoVelocity != null) {
-            targetVelocity = autoVelocity
-        } else {
-            // indicator light?
-        }
+//        if (odometry != null) {
+//            val autoVelocity = calculateShooterVel()
+//            telemetry?.addData("calculation", autoVelocity)
+//            if (autoVelocity != null) {
+//                targetVelocity = autoVelocity
+//            } else {
+//                // indicator light?
+//            }
+//        }
 
         currentVel = velocity.average
-        maxVelocity = max(velocity.average, maxVelocity)
-        telemetry?.addData("maxVelocity", maxVelocity)
+//        maxVelocity = max(velocity.average, maxVelocity)
+//        telemetry?.addData("maxVelocity", maxVelocity)
         telemetry?.addData("target", targetVelocity)
         telemetry?.addData("velocity", velocity.average)
         telemetry?.addData("power", motor.ePower)
 
         if (active) {
-            if (kicker?.reset ?: false)
+//            if (kicker?.reset ?: false) {
                 motor.ePower = 1.0
-            else {
+                val currentPos = odometry!!.position
+                val goalPos = if (isRed) redGoalPos else blueGoalPos
+
+                val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
+                val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
+                val closestPoint = closestPointOnLineSegment(
+                    goalPointA,
+                    goalPointB,
+                    currentPos.position
+                )
+
+                val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+                targetVelocity = velocityMap[distToGoalWall]
+                telemetry?.addData("distToGoalWall", distToGoalWall)
+                telemetry?.addData("last shot vel", velocity.average)
+
                 val error = targetVelocity - velocity.average
-                val rampPower = if (error > 100) 1.0 else 0.0
+                val rampPower = if (error > 400) 1.0 else 0.0
                 motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
-            }
+//            } else {
+//                val error = targetVelocity - velocity.average
+//                val rampPower = if (error > 400) 1.0 else 0.0
+//                motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+//            }
         } else {
             motor.ePower = 0.0
         }
@@ -142,25 +182,21 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     }
 
     override val apply = SystemCommand.continuous("Turret Auto Aim") {
-        deltaTime += it.deltaTime.milliseconds
-
-        // Static target position in mm
+        if (odometry == null) {
+            return@continuous
+        }
+//        // Static target position in mm
         val targetX = 3352.8 + 300
         val targetY = 0
 
-        // predicted position
-        val predictedPose = Pose(odometry.position.x + odometry.velocity.x * deltaTime.average,
-            odometry.position.y + odometry.velocity.y * deltaTime.average,
-            odometry.position.radians + odometry.velocity.radians * deltaTime.average)
-
         // Calculate angle from robot to target in field coordinates
         // Using atan2(deltaX, deltaY) because robot heading 0° = positive Y, 90° = positive X
-        val deltaX = targetX - predictedPose.x
-        val deltaY = targetY - predictedPose.y
+        val deltaX = targetX - odometry.position.x
+        val deltaY = targetY - odometry.position.y
         val angleToTarget = atan2(deltaX, deltaY) // radians
 
         // Get robot's current heading in radians
-        val robotHeading = predictedPose.radians
+        val robotHeading = odometry.position.radians
 
         // Calculate relative angle (how much turret needs to turn from robot's forward direction)
         var relativeAngle = angleToTarget - robotHeading
@@ -181,49 +217,114 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 //        turret.position = 0.5
     }
 
-    fun calculateShooterVel() : Double? {
-        val currentPos = odometry.position
-        val goalPos = if (isRed) redGoalPos else blueGoalPos
-        val kDrag = 0.168 // stupid ball is slowed down by air too much, this was calculated using the ratio of the old far and close shot values
-        val p = 1.05
-
-        val distFromGoal = sqrt((currentPos.x - goalPos.x).pow(2) + (currentPos.y - goalPos.y).pow(2))
-        // account for differences in goal distance at different angles, since the goal is triangular
-        val distToGoalWall = distFromGoal - ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) )
-
-        // the desired height of the ball when it passes over the goal wall, height of goal + 5in, in mm
-        val heightAtWall = 984.5 + 127
-
-        val ballVelocity = if (distToGoalWall * tan(rampAngle.radians) + shooterHeight - kDrag * distToGoalWall > heightAtWall) {
-            // all units must be in mm , including gravity
-            sqrt( (distToGoalWall.pow(2) * 9800) /
-                    ( 2 * cos(rampAngle.radians).pow(2) * (distToGoalWall * tan(rampAngle.radians) + shooterHeight - heightAtWall - kDrag * distToGoalWall.pow(p)) ) )
-        } else {
-            return null // if the statement is false, the shot is impossible at the current ramp angle and field position
-        }
-        // ball velocity is in 3d, we need to project it to 2d x and y to adjust for robot movement before converting back
-        val projBallVel = ballVelocity * cos(rampAngle.radians)
-
-        val shotAngle = atan2(goalPos.y - currentPos.y, goalPos.x - currentPos.x)
-        val adjusted2dBallVel =
-            sqrt((projBallVel * cos(shotAngle) - odometry.velocity.x).pow(2)
-                    + (projBallVel * sin(shotAngle) - odometry.velocity.y).pow(2))
-        // convert back to 3d
-        val adjustedBallVel = sqrt( adjusted2dBallVel.pow(2) + (ballVelocity * sin(rampAngle.radians)).pow(2) )
-
-        return ballToWheelVel[adjustedBallVel]
+    fun vectorToSegment(t: Double, a: Vector2, b: Vector2, p: Vector2): Vector2 {
+        return Vector2(
+            (1 - t) * a.x + t * b.x - p.x,
+            (1 - t) * a.y + t * b.y - p.y
+        )
     }
 
-    fun shoot() = SystemCommand.instant("Output Enable") {
+    fun closestPointOnLineSegment(a: Vector2, b: Vector2, p: Vector2): Vector2 {
+        val v = b - a
+        val u = a - p
+        val vu = v.dot(u)
+        val vv = v.x.pow(2) + v.y.pow(2)
+        val t = -vu / vv
+        if (t in 0.0..1.0) return vectorToSegment(t, a, b, Vector2())
+        val g0 = vectorToSegment(0.0, a, b, p).diag()
+        val g1 = vectorToSegment(1.0, a, b, p).diag()
+        return if (g0 <= g1) a else b
+    }
+
+//    fun calculateShooterVel() : Double? {
+//        val currentPos = odometry!!.position
+//        val goalPos = if (isRed) redGoalPos else blueGoalPos
+//        val kDrag = 0.168 // stupid ball is slowed down by air too much, this was calculated using the ratio of the old far and close shot values
+//        val p = 1.05
+//
+////        val distFromGoal = sqrt((currentPos.x - goalPos.x).pow(2) + (currentPos.y - goalPos.y).pow(2))
+////        // account for differences in goal distance at different angles, since the goal is triangular
+////        val distToGoalWall = distFromGoal - ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) )
+////        telemetry?.addData("thing", ( k / ( cos(PI/4 - atan2(currentPos.y - goalPos.y, currentPos.x - goalPos.x)) ) ))
+//
+//        val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
+//        val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
+//        val closestPoint = closestPointOnLineSegment(
+//            goalPointA,
+//            goalPointB,
+//            currentPos.position
+//        )
+//
+//        val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+//        telemetry?.addData("distToGoalWall", distToGoalWall)
+//        telemetry?.addData("closestPoint", closestPoint.toString())
+//
+//
+//        // the desired height of the ball when it passes over the goal wall, height of goal + 5in, in mm
+//        val heightAtWall = 984.5 + 127
+//
+//        val ballVelocity = if (distToGoalWall * tan(rampAngle.radians) + shooterHeight - kDrag * distToGoalWall > heightAtWall) {
+//            // all units must be in mm , including gravity
+//            sqrt( (distToGoalWall.pow(2) * 9800) /
+//                    ( 2 * cos(rampAngle.radians).pow(2) * (distToGoalWall * tan(rampAngle.radians) + shooterHeight - heightAtWall - kDrag * distToGoalWall.pow(p)) ) )
+//        } else {
+//            return null // if the statement is false, the shot is impossible at the current ramp angle and field position
+//        }
+//        telemetry?.addData("ball vel", ballVelocity)
+//        // ball velocity is in 3d, we need to project it to 2d x and y to adjust for robot movement before converting back
+//        val projBallVel = ballVelocity * cos(rampAngle.radians)
+//
+//        val shotAngle = atan2(goalPos.y - currentPos.y, goalPos.x - currentPos.x)
+//        val adjusted2dBallVel =
+//            sqrt((projBallVel * cos(shotAngle) - odometry.velocity.x).pow(2)
+//                    + (projBallVel * sin(shotAngle) - odometry.velocity.y).pow(2))
+//        // convert back to 3d
+//        val adjustedBallVel = sqrt( adjusted2dBallVel.pow(2) + (ballVelocity * sin(rampAngle.radians)).pow(2) )
+//
+//        telemetry?.addData("adjustedBallVel", adjustedBallVel)
+//        telemetry?.addData("friction", ballToWheelVel[adjustedBallVel])
+//
+//        return ballToWheelVel[adjustedBallVel]
+//    }
+
+    fun shoot() = SystemCommand.instant("Output Enable Far Target") {
 //        motor.power = .83
         targetVelocity = farTarget
         active = true
     }
 
-    fun shootClose() = SystemCommand.instant("Output Enable Slow") {
+    fun shootClose() = SystemCommand.instant("Output Enable Close Target") {
 //        motor.power = .73
         targetVelocity = closeTarget
         active = true
+    }
+
+    fun incVel() = SystemCommand.instant("Output Enable") {
+        targetVelocity += 100
+        active = true
+    }
+
+    fun decVel() = SystemCommand.instant("Output Enable") {
+        if (targetVelocity > 100) {
+            targetVelocity -= 100
+        } else {
+            targetVelocity = 0.0
+            active = false
+        }
+    }
+
+    fun smallIncVel() = SystemCommand.instant("Output Enable") {
+        targetVelocity += 10
+        active = true
+    }
+
+    fun smallDecVel() = SystemCommand.instant("Output Enable") {
+        if (targetVelocity > 10) {
+            targetVelocity -= 10
+        } else {
+            targetVelocity = 0.0
+            active = false
+        }
     }
 
     fun stop() = SystemCommand.instant("Output Disable") {
@@ -241,7 +342,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     }
 
     fun resetOdometry() = SystemCommand.instant("Reset Odometry") {
-        odometry.setPose(Pose(609.6 * 6 - Distance.inch(9).mm / 2, 609.6 * 3, 270))
+        odometry?.setPose(Pose(609.6 * 6 - Distance.inch(9).mm / 2, 609.6 * 3, 270))
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -252,6 +353,10 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             stop?.let { builder.register(it) { stop() } }
             toggle?.let { builder.register(it) { if (active && targetVelocity == farTarget) stop() else shoot() } }
             toggleSlow?.let { builder.register(it) { if (active && targetVelocity == closeTarget) stop() else shootClose() } }
+            incVel?.let { builder.register(it) { incVel() } }
+            decVel?.let { builder.register(it) { decVel() } }
+            smallIncVel?.let { builder.register(it) { smallIncVel() } }
+            smallDecVel?.let { builder.register(it) { smallDecVel() } }
             aimLeft?.let { builder.register(it) { turnLeft() } }
             aimRight?.let { builder.register(it) { turnRight() } }
             resetOdometry?.let { builder.register(it) { resetOdometry() } }

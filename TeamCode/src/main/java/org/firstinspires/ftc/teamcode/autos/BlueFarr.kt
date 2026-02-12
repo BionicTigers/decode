@@ -10,29 +10,32 @@ import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Output
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
+import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.Pose
 
 @Autonomous
 class BlueFarr: LinearOpMode() {
     val startPose = Pose(0, 0, 0)
-    val endPose = Pose(0, 600, 0)
+    val endPose = Pose(0, 600, Angle.degrees(180))
 
     override fun runOpMode() {
         val odometry = Odometry(hardwareMap, telemetry, startPose)
         val octoQuad = OctoQuad(hardwareMap, telemetry)
 
         val drivetrain = Drivetrain(hardwareMap, telemetry, odometry, octoQuad)
-        val intake = Intake(hardwareMap, octoQuad)
-        val kicker = Kicker(hardwareMap)
-        val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
+//        val intake = Intake(hardwareMap, octoQuad)
+//        val kicker = Kicker(hardwareMap)
+//        val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
+//        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
 
-        Scheduler.schedule(odometry, drivetrain, intake, kicker, sorter, output)
+//        Scheduler.schedule(odometry, drivetrain, intake, kicker, sorter, output)
+        Scheduler.schedule(odometry, drivetrain)
+
 
         Scheduler.schedule(drivetrain.moveToPosition(endPose))
 
         waitForStart()
-        sorter.move()
+//        sorter.move()
 
         while (opModeIsActive()) {
             Scheduler.tick()

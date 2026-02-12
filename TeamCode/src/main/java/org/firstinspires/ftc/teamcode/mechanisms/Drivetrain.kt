@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.mechanisms
 
-import android.annotation.SuppressLint
 import io.github.bionictigers.axiom.core.commands.System
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
@@ -17,6 +16,7 @@ import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import io.github.bionictigers.axiom.core.web.WebData
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
+import org.firstinspires.ftc.teamcode.control.MotionResult
 import org.firstinspires.ftc.teamcode.control.PID
 import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
@@ -36,6 +36,7 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -83,19 +84,24 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         val angularMaxVelocity = Angle.degrees(390.0)//390
 
         // TODO: Remeasure with corrected ticks/rev conversion
-        // in ticks/10ms, there are 384.5 ticks/rev for 435rpm 5203s https://www.gobilda.com/yellow-jacket-planetary-gear-motors?srsltid=AfmBOorR8B21Lt_Da5g7XxAyMjSV-vw9o19dorK7f_eDrLGrl9Zb0Orc
+        // in ticks/10ms
         val wheelMaxVel = 71.0
-
+        // there are 384.5 ticks/rev for 435rpm 5203s https://www.gobilda.com/yellow-jacket-planetary-gear-motors?srsltid=AfmBOorR8B21Lt_Da5g7XxAyMjSV-vw9o19dorK7f_eDrLGrl9Zb0Orc
+        val ticksPerRev = 384.5
         val xProfile = MotionProfile(xJerk, xMaxAcceleration, xMaxVelocity)
         val yProfile = MotionProfile(yJerk, yMaxAcceleration, yMaxVelocity)
         val angularProfile = MotionProfile(angularJerk.radians, angularMaxAcceleration.radians, angularMaxVelocity.radians)
 
+        val wheelRadius = 0.096
+        val lx = 0.371475
+        val ly = 0.352425
+
         val K: Matrix = Matrix(
             arrayOf(
-                arrayOf(11.770925391627317, 11.770925391626937, 1.253775372004271, 10.562907814607939, 10.562907814607618, 1.358080137007490),
-                arrayOf(-11.770925391627392, 11.770925391627062, -1.253775372004275, -10.562907814607968, 10.562907814607664, -1.358080137007492),
-                arrayOf(-11.770925391627342, 11.770925391627053, 1.253775372004267, -10.562907814607916, 10.562907814607650, 1.358080137007483),
-                arrayOf(11.770925391627268, 11.770925391626943, -1.253775372004272, 10.562907814607893, 10.562907814607629, -1.358080137007485),
+                arrayOf(0.079626121631806, 0.079626121631807, 0.017897507820257, 0.142412262363277, -0.000686597231607, 0.000686597231607, 0.001525436283586),
+                arrayOf(-0.079626121631805, 0.079626121631810, -0.017897507820257, -0.000686597231607, 0.142412262363277, 0.001525436283586, 0.000686597231607),
+                arrayOf(-0.079626121631806, 0.079626121631807, 0.017897507820257, 0.000686597231607, 0.001525436283586, 0.142412262363277, -0.000686597231607),
+                arrayOf(0.079626121631805, 0.079626121631810, -0.017897507820257, 0.001525436283586, 0.000686597231607, -0.000686597231607, 0.142412262363277),
             )
         )
 
@@ -238,12 +244,11 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             if (mtp != null) {
                 with(mtp!!) {
 //                    println("pid calculated, ${it.deltaTime} loop time")
-                    powers.set(pids.calculatePowers(controlState))
+                    powers.set(controlState)
                     // TODO: add heading pid modifier
 
                     telemetry?.addData("Error", errorState.printSimple())
-                    telemetry?.addData("Target Accelerations", controlState.printSimple())
-                    telemetry?.addData("pid", pids)
+                    telemetry?.addData("Control State", controlState.printSimple())
                     telemetry?.addData("powers", powers)
                 }
             } else {
@@ -279,7 +284,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             )
 
             with(mtp!!) {
-                errorState = getErrorState(startTime.elapsedNow() + 200.milliseconds)
+                errorState = getErrorState(startTime.elapsedNow() + 20.milliseconds)
                 controlState = (-K * errorState).scalar(30.0)
             }
 
@@ -294,7 +299,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
     }
 
     var firstRun = true
-    fun calculateLQR() = Command.create("LQR Calculation", interval = 200.milliseconds) {
+    fun calculateLQR() = Command.create("LQR Calculation", interval = 20.milliseconds) {
         enter {
             println("LQR start")
             firstRun = true
@@ -314,12 +319,11 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 //            println("LQR, previous dt: ${it.deltaTime}")
 
             with(mtp!!) {
-                errorState = getErrorState(startTime.elapsedNow() + 200.milliseconds)
+                errorState = getErrorState(startTime.elapsedNow() + 20.milliseconds)
                 controlState = (-K * errorState).scalar(30.0)
             }
         }
     }
-
 
     fun largeChange(list:List<Double>, otherList: List<Double>): Boolean {
         list.forEachIndexed { index, num ->
@@ -343,20 +347,60 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         val currentVelocity = odometry.velocity
 
         with (mtp!!) { // odo values are in mm and mm/s, need to swap to m for LQR calculations
-            val x = currentPose.x/1000 - (xResult.getPosition(time))
-            val y = currentPose.y/1000 - (yResult.getPosition(time))
+            val xGlobal = currentPose.x/1000 - (xResult.getPosition(time))
+            val yGlobal = currentPose.y/1000 - (yResult.getPosition(time))
             val rot = currentPose.radians - (angularResult.getPosition(time))
+
+            // convert global deltas to local deltas so LQR dynamics stay linear
+
+//            val h = sqrt(xGlobal.pow(2) + yGlobal.pow(2))
+//            val a = Angle.degrees((Angle.radians(atan2(yGlobal, xGlobal)).degrees + 90).normalizeDegrees() + currentPose.degrees).radians
+//
+//            val x = h * sin(a)
+//            val y = h * cos(a)
+
+            val theta = currentPose.radians
+
+            val x =  xGlobal * cos(theta) + yGlobal * sin(theta)
+            val y = -xGlobal * sin(theta) + yGlobal * cos(theta)
+
+
 //            println(angularResult.getPosition(time))
-            val vx = currentVelocity.x/1000 - (xResult.getVelocity(time))
-            val vy = currentVelocity.y/1000 - (yResult.getVelocity(time))
-            val w = currentVelocity.radians - (angularResult.getVelocity(time))
+//            val vx = currentVelocity.x/1000 - (xResult.getVelocity(time))
+//            val vy = currentVelocity.y/1000 - (yResult.getVelocity(time))
+//            val w = currentVelocity.radians - (angularResult.getVelocity(time))
+
+            // get vel linear is in mm/s i want m, botToWheelVels gives rad/s
+
+            val vx =  xResult.getVelocity(time)/1000 * cos(theta) + yResult.getVelocity(time)/1000 * sin(theta)
+            val vy = -xResult.getVelocity(time)/1000 * sin(theta) + yResult.getVelocity(time)/1000 * cos(theta)
+
+            val targetW = botToWheelVels(Pose(vx, vy, angularResult.getVelocity(time)))
+            telemetry?.addData("targetW", targetW.toString())
+
+            // velocities are in ticks/10ms :( I want rad/s!!!!!!!
+            val conv = 1/ticksPerRev * (2*PI) + (1/.01)
+
+            val wfl = (velocities.frontLeft*conv) - targetW.frontLeft
+            val wfr = (velocities.frontRight*conv) - targetW.frontRight
+            val wbl = (velocities.backLeft*conv) - targetW.backLeft
+            val wbr = (velocities.backRight*conv) - targetW.backRight
 
             return Matrix(
                 arrayOf(
-                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(vx), arrayOf(vy), arrayOf(w)
+                    arrayOf(x), arrayOf(y), arrayOf(rot), arrayOf(wfl), arrayOf(wfr), arrayOf(wbl), arrayOf(wbr)
                 )
             )
         }
+    }
+
+    fun botToWheelVels(botVel: Pose) : MotorValues<Double> {
+        return MotorValues(
+            (1 / wheelRadius) * (botVel.y - botVel.x + (lx + ly) * botVel.radians),
+            (1 / wheelRadius) * (botVel.y + botVel.x - (lx + ly) * botVel.radians),
+            (1 / wheelRadius) * (botVel.y + botVel.x + (lx + ly) * botVel.radians),
+            (1 / wheelRadius) * (botVel.y - botVel.x - (lx + ly) * botVel.radians),
+            ) // gives rad/s
     }
 
 //    fun mtpNoProfile(targetPose: Pose) = Command.create("Move to Position") {
@@ -538,12 +582,12 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             return feedFrwrd.zip(modifiers) { power, mod -> power + mod }
         }
 
-        fun calculatePowers(matrix: Matrix) : List<Double> {
-            setPoints.set(calculateTargetVels(matrix))
-            feedFrwrd.set(calculateFFPowers())
-            modifiers.set(calculateModifiers())
-            return feedFrwrd.zip(modifiers) { power, mod -> power + mod }
-        }
+//        fun calculatePowers(matrix: Matrix) : List<Double> {
+//            setPoints.set(calculateTargetVels(matrix))
+//            feedFrwrd.set(calculateFFPowers())
+//            modifiers.set(calculateModifiers())
+//            return feedFrwrd.zip(modifiers) { power, mod -> power + mod }
+//        }
 
         private fun calculateFFPowers(): List<Double> {
             return setPoints.mapIndexed { index, velocity ->
@@ -663,12 +707,16 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         backRight = null
     }
 
+    fun MotorValues<Double>.set(matrix: Matrix) {
+        listOf(matrix[0,0], matrix[1,0], matrix[2,0], matrix[3,0]).forEachIndexed{ index, it -> this[index] = it }
+    }
+
     data class MoveVariables(
         var finalPose: Pose,
         var targetPose: Pose,
-        var xResult: MotionProfile.MotionResult,
-        var yResult: MotionProfile.MotionResult,
-        var angularResult: MotionProfile.MotionResult,
+        var xResult: MotionResult,
+        var yResult: MotionResult,
+        var angularResult: MotionResult,
         var startTime: TimeMark,
         var errorState: Matrix,
         var controlState: Matrix,

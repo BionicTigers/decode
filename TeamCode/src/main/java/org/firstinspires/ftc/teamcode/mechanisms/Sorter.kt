@@ -4,7 +4,6 @@ import com.qualcomm.robotcore.hardware.ColorSensor
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
-import com.qualcomm.robotcore.hardware.DigitalChannel
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.TouchSensor
 import io.github.bionictigers.axiom.core.commands.System
@@ -15,38 +14,56 @@ import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Digital
 import io.github.bionictigers.axiom.core.web.Editable
+import io.github.bionictigers.axiom.core.web.Hidden
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
-import org.firstinspires.ftc.teamcode.control.MotionProfile.MotionResult
+import org.firstinspires.ftc.teamcode.control.MotionResult
 import org.firstinspires.ftc.teamcode.control.PID
-import org.firstinspires.ftc.teamcode.drivers.OctoQuadFWv3
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.ControlHub
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.seconds
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
-import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.withSign
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
-import kotlin.time.TimeSource
 
-class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Telemetry? = null, octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
+class Sorter(
+    hardwareMap: HardwareMap,
+    kicker: Kicker? = null,
+    telemetry: Telemetry? = null,
+    octoQuad: OctoQuad
+) : System(), Controllable<BaseProfile> {
     override val name: String = "Sorter"
     override val dependencies = listOf(octoQuad)
 
     companion object {
-        val jerk = 15000
-        val maxAccel = 8690.9
-        val maxVel =  2680.3023
+        val jerk = listOf(
+            15000,
+            13000,
+            11000,
+            9000
+        )
+        val maxAccel = listOf(
+            8690.9,
+            8090.9,
+            7490.9,
+            7190.9,
+        )
+        val maxVel = listOf(
+            2680.3023,
+            2280.3023,
+            1700.3023,
+            1500.3023,
+        )
 
         private const val TICKS_PER_REV = 8192.0
-        private const val HOME_ANGLE_DEG = 20.0
 
         private fun wrap360(deg: Double): Double {
             val m = deg % 360.0
@@ -64,56 +81,20 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         }
     }
 
-    var isOutput: Boolean = false
-    var step: Int = 0
-    var angle: Double = 0.0
-    private var angleUnwrapped: Double = 0.0
-    private var targetUnwrapped: Double = 0.0  // PID tracks this against angleUnwrapped
-    var angleVel: Double = 0.0
-    var maxVel: Double = 0.0
-    var maxAccel: Double = 0.0
-    var target: Double = 0.0
-    private var lastLimitPressed: Boolean = false
-    @Editable var debugColorPrints: Boolean = false
-    @Editable var static = 0.15
-//    val pid: DynamicPID = DynamicPID(GainSchedule(
-//        mapOf(
-//            0.0 to .8, //8.0,
-//            90.0 to 1.0, //1.5,
-//            180.0 to 2.0, //.4, //2, 1.5, .75
-//        ),
-//        mapOf(0.0 to 0.0),
-//        mapOf(0.0 to 0.0)
-//    ), 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds, { abs(it) })
-    @Editable
-    val pid: PID = PID(1.35,2.0,0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds) // test
-    @Editable var kS: Double = 0.01
-    @Editable var kV: Double = 0.0007
-    @Editable var kA: Double = 0.0
-    @Editable
-    val motionProfile: MotionProfile = MotionProfile(jerk,
-        Companion.maxAccel,
-        Companion.maxVel, 12.12)
-    var currentProfile: MotionResult? = null
-    var startTime: TimeMark? = null
-
-    var profileVelocity = 0.0
-    var profileAcceleration = 0.0
-    var junkTicks = octoQuad.encoderData.position[5]
-    private var profileDirection: Double = 1.0
-
-    @Editable
-    var offset = -25.0
-
-    var error = 0.0
-    var mpTarget = 0.0
-
-    val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
-
     enum class BallColor {
         Green,
         Purple,
         None
+    }
+
+    /**
+     * Physical positions around the carousel relative to robot hardware.
+     * These stay fixed while `step` changes as the carousel rotates.
+     */
+    enum class SlotPosition {
+        Intake,
+        Middle,
+        Output
     }
 
     interface Schema : ControlSchema {
@@ -124,77 +105,128 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         val openIntake: Digital?
         val openHuman: Digital?
         val outputToggle: Digital?
-//        val kick: Digital?
     }
 
-    val motor = hardwareMap.getByName<DcMotorEx>("sorter")
-    val hub = ControlHub(hardwareMap, "Control Hub")
-    val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
-    val limitSwitch = hardwareMap.getByName<TouchSensor>("limitSwitch")
+    // Hardware
+    private val motor = hardwareMap.getByName<DcMotorEx>("sorter")
+    private val hub = ControlHub(hardwareMap, "Control Hub")
+    private val colorSensor = hardwareMap.getByName<ColorSensor>("intakeColor")
+    private val limitSwitch = hardwareMap.getByName<TouchSensor>("limitSwitch")
 
-    var previousState = false
+    // Pose + controller state
+    var isOutput: Boolean = false
+    var step: Int = 0
+    var angle: Double = 0.0
+    private var angleUnwrapped: Double = 0.0
+    private var targetUnwrapped: Double = 0.0
+    var angleVel: Double = 0.0
+    @Hidden
+    var maxVel: Double = 0.0
+    @Hidden
+    var maxAccel: Double = 0.0
+    var target: Double = 0.0
+    var error = 0.0
+
+
+    // Runtime buffers
+    private var junkTicks = octoQuad.encoderData.position[5]
+    val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
+
+    @Editable var kG = 0.067
+    @Editable
+    val pid: PID = PID(1.3, 0.0, 0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds)
+//    @Editable var kS: Double = 0.01
+//    @Editable var kV: Double = 0.0007
+//    @Editable var kA: Double = 0.0
+    @Editable
+    val motionProfile: MotionProfile = MotionProfile(
+        jerk[0],
+        Companion.maxAccel[0],
+        Companion.maxVel[0],
+        12.12
+    )
+    @Editable
+    @Hidden
+    var offset = -25.0
+    @Hidden
+    var currentProfile: MotionResult? = null
+    @Hidden
+    var startTime: TimeMark? = null
+    @Hidden
+    var profileVelocity = 0.0
+    @Hidden
+    var profileAcceleration = 0.0
+    @Hidden
+    var mpTarget = 0.0
+
+    // Gravity Feed Forward
+    var ffg = 0.0
+    private var lastSeenIntakeColor: BallColor = BallColor.None
 
     init {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-        motor.direction = DcMotorSimple.Direction.REVERSE
+        motor.direction = DcMotorSimple.Direction.FORWARD
         hub.setJunkTicks(3)
         pid.reset()
-
-//        octoQuad.octoQuad.channelBankConfig = OctoQuadFWv3.ChannelBankConfig.BANK1_QUADRATURE_BANK2_PULSE_WIDTH
-//        octoQuad.octoQuad.setSingleChannelPulseWidthParams(5, 1, 1024)
     }
 
     override val update = SystemCommand.continuous("Sorter Update") {
         val oldAngleVel = angleVel
-//        println(limitSwitch.isPressed)
+        val deltaTicks = octoQuad.encoderData.position[5] - junkTicks
+        val dt = it.deltaTime.seconds
+        val deltaAngle = -(deltaTicks / TICKS_PER_REV) * 360.0
 
-//        if (!limitSwitch.isPressed && !previousState) {
-//            angle = 20.0
-//            angleUnwrapped = 20.0
-//            previousState = true
-//            println("pressing!!!! at $angle")
-//        } else {
-//            previousState = false
-            val deltaTicks = octoQuad.encoderData.position[5] - junkTicks
-            val dt = it.deltaTime.seconds
-
-            val deltaAngle = -(deltaTicks / TICKS_PER_REV) * 360.0
-            angleUnwrapped += deltaAngle
-            angle = wrap360(angleUnwrapped)
-            angleVel = if (dt == 0.0) 0.0 else deltaAngle / dt
-//        }
+        angleUnwrapped += deltaAngle
+        angle = wrap360(angleUnwrapped)
+        angleVel = if (dt == 0.0) 0.0 else deltaAngle / dt
 
         maxVel = max(angleVel, maxVel)
-        maxAccel = max((angleVel - oldAngleVel)/it.deltaTime.seconds, maxAccel)
+        maxAccel = max((angleVel - oldAngleVel) / it.deltaTime.seconds, maxAccel)
 
         telemetry?.addData("sorter max velocity", maxVel)
         telemetry?.addData("sorter max acceleration", maxAccel)
 
-        val isGreen  = colorSensor.red() < 250 && colorSensor.green() > 200 && colorSensor.blue() < 260
-        val isPurple = colorSensor.red() > 180 && colorSensor.green() < 400 && colorSensor.blue() > 300
+        val red = colorSensor.red()
+        val green = colorSensor.green()
+        val blue = colorSensor.blue()
 
-        telemetry?.addData("red", colorSensor.red())
-        telemetry?.addData("green", colorSensor.green())
-        telemetry?.addData("blue", colorSensor.blue())
+        val isGreen = green > red && green > blue - 100 && green > 300
+        val isPurple = blue > red && blue > green && blue > 300
+        val detectedColor = when {
+            isGreen -> BallColor.Green
+            isPurple -> BallColor.Purple
+            else -> BallColor.None
+        }
 
-
+        telemetry?.addData("red", red)
+        telemetry?.addData("green", green)
+        telemetry?.addData("blue", blue)
         telemetry?.addData("green?", isGreen)
         telemetry?.addData("purple?", isPurple)
 
-//        if (isGreen)
-//            colors[step] = BallColor.Green
-//        else if (isPurple)
-//            colors[step] = BallColor.Purple
-//
-//        if (kicker?.state?.kickedThisCycle ?: false) {
-//            colors[(step + 2) % 3] = BallColor.None
-//        }
-
-        if (debugColorPrints) {
-            if (isGreen) println("Green")
-            else if (isPurple) println("Purple")
-            else println("Nothing!!")
+        // Track which ball is currently in the transfer intake position.
+        // We only latch on a rising edge (None -> Color) to avoid noise/flapping writes.
+        if (detectedColor != BallColor.None && lastSeenIntakeColor == BallColor.None) {
+            colors[slotIndexForPosition(SlotPosition.Intake)] = detectedColor
         }
+        lastSeenIntakeColor = detectedColor
+
+        // Remove the ball that just left through the kicker output.
+        if (kicker?.kickedThisCycle == true) {
+            colors[slotIndexForPosition(SlotPosition.Output)] = BallColor.None
+        }
+
+        ffg = abs(listOfNotNull(
+            sin(Math.toRadians(angle - 30.45)).takeIf { colors[0] != BallColor.None },
+            sin(Math.toRadians(angle - 30.45) + 2 * PI / 3).takeIf { colors[1] != BallColor.None },
+            sin(Math.toRadians(angle - 30.45) + 4 * PI / 3).takeIf { colors[2] != BallColor.None },
+        ).sum())
+
+        motionProfile.setConstants(
+            jerk[occupiedBays],
+            Companion.maxAccel[occupiedBays],
+            Companion.maxVel[occupiedBays]
+        )
 
         junkTicks = octoQuad.encoderData.position[5]
     }
@@ -208,27 +240,9 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
             return@continuous
         }
 
-        // Simple PID using unwrapped angles - no clamping needed
-        // The target is set in move() to always be in the forward direction
         error = angleUnwrapped - targetUnwrapped
-        var pidOutput = if (error > 10) {
-            -pid.compute(error, 0.0) + static
-        } else {
-            -pid.compute(error, 0.0)
-        }
-            motor.ePower = pidOutput.coerceIn(-1.0, 1.0)
-
-//        val voltage = hub.getVoltage()
-//        if (voltage < 12.0)
-//            pidOutput += ((1.0 - hub.getVoltage() / 12.0 + .2) * .25).withSign(pidOutput)
-
-//        if (abs(error) > 40)
-//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + (.02 / (40 - 5) * abs(error) + .05 ).withSign(pidOutput)
-//        else if (abs(error) > 5)
-//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .05.withSign(pidOutput)
-//        else
-//            motor.ePower = pidOutput.coerceIn(-1.0, 1.0) + .04.withSign(pidOutput)
-
+        val pidOutput = pid.compute(error, 0.0)
+        motor.ePower = (abs(pidOutput) + ffg * kG).withSign(pidOutput)
 
         telemetry?.addData("step", step)
         telemetry?.addData("ticks from encoder", hub.getEncoderTicks(3))
@@ -236,6 +250,15 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
         telemetry?.addData("target", target)
         telemetry?.addData("error", error)
         telemetry?.addData("power", motor.power)
+        telemetry?.addData("intake slot color", getBallAtPosition(SlotPosition.Intake))
+        telemetry?.addData("middle slot color", getBallAtPosition(SlotPosition.Middle))
+        telemetry?.addData("output slot color", getBallAtPosition(SlotPosition.Output))
+        telemetry?.addData(
+            "transfer order (I>M>O)",
+            "${colorShort(getBallAtPosition(SlotPosition.Intake))} > " +
+                "${colorShort(getBallAtPosition(SlotPosition.Middle))} > " +
+                colorShort(getBallAtPosition(SlotPosition.Output))
+        )
     }
 
     fun outputPositionToggle() = SystemCommand.instant("toggle output positions") {
@@ -244,27 +267,19 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     }
 
     fun move() {
-        when (step) {
-            0 -> target = 0.0
-            1 -> target = 120.0
-            2 -> target = 240.0
+        target = when (step) {
+            0 -> 0.0
+            1 -> 120.0
+            2 -> 240.0
+            else -> 0.0
         }
-        if (isOutput) {
-            target -= offset // ball in intake position flips to output position
-        }
-        
-        // Set targetUnwrapped so we always go backward (increasing angle) for big moves
-        // angleErrorDeg: negative = target ahead (need to go backward/increase), positive = target behind (need to go forward/decrease)
-        val shortestError = angleErrorDeg(target, angle)
-//        if (shortestError < 50) {
-//            // Shortest path is backward (increasing) - use it
-//            targetUnwrapped = angleUnwrapped - shortestError
-//        } else {
-//            // Shortest path is forward - go the long way backward instead
-//            targetUnwrapped = angleUnwrapped + (360.0 - shortestError)
-//        }
-        targetUnwrapped = angleUnwrapped - shortestError
 
+        if (isOutput) {
+            target -= offset
+        }
+
+        val shortestError = angleErrorDeg(target, angle)
+        targetUnwrapped = angleUnwrapped - shortestError
         pid.reset()
     }
 
@@ -279,69 +294,93 @@ class Sorter(hardwareMap: HardwareMap, kicker: Kicker? = null, telemetry: Teleme
     }
 
     fun targetGreen() = SystemCommand.instant("target green") {
-        val currentStep = step
-        val desiredOutputStep = (currentStep + 2) % 3
-
-        val greenSteps = colors.mapIndexed { index, color -> if (color == BallColor.Green) index else -1 }.filter { it != -1 }
-        if (greenSteps.isEmpty()) return@instant
-
-        // Choose the nearest forward-rotation green index (respecting forward-only major movement)
-        val forwardDistances = greenSteps.map { targetIndex ->
-            val forwardSteps = (targetIndex - currentStep + 3) % 3
-            targetIndex to forwardSteps
-        }
-
-        val (nearestGreenIndex, _) = forwardDistances.minBy { it.second }
-
-        // Compute how many forward steps are needed to bring that green to the output index
-        val deltaStepsToOutput = (desiredOutputStep - nearestGreenIndex + 3) % 3
-        val newStep = (currentStep + deltaStepsToOutput) % 3
-
-        step = newStep
+        selectStepForColor(BallColor.Green)?.let { step = it }
     }
 
     fun targetPurple() = SystemCommand.instant("target purple") {
+        selectStepForColor(BallColor.Purple)?.let { step = it }
+    }
+
+    fun openIntake() = SystemCommand.instant("open intake") {
+        selectStepForOpen(desiredStep = 0)?.let { step = it }
+    }
+
+    fun openHuman() = SystemCommand.instant("open human") {
+        selectStepForOpen(desiredStep = 2)?.let { step = it }
+    }
+
+    fun getBallAtPosition(position: SlotPosition): BallColor {
+        val slotIndex = slotIndexForPosition(position)
+        return colors[slotIndex]
+    }
+
+    fun hasBallAtPosition(position: SlotPosition): Boolean {
+        return getBallAtPosition(position) != BallColor.None
+    }
+
+    fun getBallAtOffsetFromIntake(offset: Int): BallColor {
+        val slotIndex = ((step + offset) % 3 + 3) % 3
+        return colors[slotIndex]
+    }
+
+    fun hasBallAtOffsetFromIntake(offset: Int): Boolean {
+        return getBallAtOffsetFromIntake(offset) != BallColor.None
+    }
+
+    fun hasBallAtIndex(slotIndex: Int): Boolean {
+        val normalizedIndex = ((slotIndex % 3) + 3) % 3
+        return colors[normalizedIndex] != BallColor.None
+    }
+
+    val occupiedBays: Int
+        get() = colors.count { it != BallColor.None }
+
+    private fun selectStepForColor(color: BallColor): Int? {
         val currentStep = step
         val desiredOutputStep = (currentStep + 2) % 3
 
-        val purpleSteps = colors.mapIndexed { index, color -> if (color == BallColor.Purple) index else -1 }.filter { it != -1 }
-        if (purpleSteps.isEmpty()) return@instant
+        val colorSteps = colors.mapIndexedNotNull { index, ballColor ->
+            index.takeIf { ballColor == color }
+        }
+        if (colorSteps.isEmpty()) return null
 
-        val forwardDistances = purpleSteps.map { targetIndex ->
+        val forwardDistances = colorSteps.map { targetIndex ->
             val forwardSteps = (targetIndex - currentStep + 3) % 3
             targetIndex to forwardSteps
         }
 
-        val (nearestPurpleIndex, _) = forwardDistances.minBy { it.second }
-
-        val deltaStepsToOutput = (desiredOutputStep - nearestPurpleIndex + 3) % 3
-        val newStep = (currentStep + deltaStepsToOutput) % 3
-
-        step = newStep
+        val (nearestIndex, _) = forwardDistances.minBy { it.second }
+        val deltaStepsToOutput = (desiredOutputStep - nearestIndex + 3) % 3
+        return (currentStep + deltaStepsToOutput) % 3
     }
 
-    fun openIntake() = SystemCommand.instant("open intake") {
+    private fun selectStepForOpen(desiredStep: Int): Int? {
         val currentStep = step
-        val desiredStep = 0
 
-        val noneSteps = colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
-        if (noneSteps.isEmpty()) return@instant
+        val noneSteps = colors.mapIndexedNotNull { index, color ->
+            index.takeIf { color == BallColor.None }
+        }
+        if (noneSteps.isEmpty()) return null
 
-        val deltas = noneSteps.map { idx -> idx to ((desiredStep - idx + 3) % 3) }
+        val deltas = noneSteps.map { idx -> idx to (desiredStep - idx + 3) % 3 }
         val (_, minDelta) = deltas.minBy { it.second }
-        step = (currentStep + minDelta) % 3
+        return (currentStep + minDelta) % 3
     }
 
-    fun openHuman() = SystemCommand.instant("open human") {
-        val currentStep = step
-        val desiredStep = 2
+    private fun slotIndexForPosition(position: SlotPosition): Int {
+        return when (position) {
+            SlotPosition.Intake -> step
+            SlotPosition.Middle -> (step + 1) % 3
+            SlotPosition.Output -> (step + 2) % 3
+        }
+    }
 
-        val noneSteps = colors.mapIndexed { index, color -> if (color == BallColor.None) index else -1 }.filter { it != -1 }
-        if (noneSteps.isEmpty()) return@instant
-
-        val deltas = noneSteps.map { idx -> idx to ((desiredStep - idx + 3) % 3) }
-        val (_, minDelta) = deltas.minBy { it.second }
-        step = (currentStep + minDelta) % 3
+    private fun colorShort(color: BallColor): String {
+        return when (color) {
+            BallColor.Green -> "G"
+            BallColor.Purple -> "P"
+            BallColor.None -> "_"
+        }
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
