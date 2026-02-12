@@ -52,7 +52,6 @@ class Odometry(
 
     var position = startPose
     var velocity = Pose(0.0, 0.0, 0.0)
-    var fielaVelocity = Pose(0.0, 0.0, 0.0)
     var state = Matrix(
         arrayOf(
             arrayOf(position.x),
@@ -68,7 +67,7 @@ class Odometry(
         pinpoint.setOffsets(config.forwardOffset.mm, config.strafeOffset.mm, DistanceUnit.MM)
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
         pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED)
-            pinpoint.recalibrateIMU()
+        pinpoint.recalibrateIMU()
         pinpoint.setPosition(Pose2D(DistanceUnit.MM,startPose.y, -startPose.x, AngleUnit.DEGREES, -startPose.degrees))
     }
 

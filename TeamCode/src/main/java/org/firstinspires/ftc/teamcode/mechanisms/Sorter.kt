@@ -147,7 +147,7 @@ class Sorter(
     )
     @Editable
     @Hidden
-    var offset = -25.0
+    var offset = -40.0
     @Hidden
     var currentProfile: MotionResult? = null
     @Hidden

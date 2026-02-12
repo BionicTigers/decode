@@ -23,11 +23,11 @@ class MainControl : LinearOpMode() {
         val b = TimeSource.Monotonic.markNow()
         val odometry = Odometry(hardwareMap, null, Pose(609.6*.5, 609.6*3 - 609.6*.5, 90.0)) //Pose(609.6 * 6 - 609.6 * (4/5), 609.6, 270))
         val octoquad = OctoQuad(hardwareMap, null)
-        val drivetrain = Drivetrain(hardwareMap, null, odometry, octoquad)
+        val drivetrain = Drivetrain(hardwareMap, telemetry, odometry, octoquad)
         val intake = Intake(hardwareMap, octoquad)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, null, octoquad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoquad, true)
+        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad, true)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )

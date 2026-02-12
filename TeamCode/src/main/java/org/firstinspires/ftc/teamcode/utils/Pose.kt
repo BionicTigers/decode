@@ -10,6 +10,7 @@ import kotlin.math.absoluteValue
 class Pose(@Editable @Display val x: Double, @Editable @Display val y: Double, @Editable @Display private val rot: Double) {
     constructor(x: Number, y: Number, rot: Number) : this(x.toDouble(), y.toDouble(), rot.toDouble())
     constructor(x: Number, y: Number, rot: Angle) : this(x.toDouble(), y.toDouble(), rot.degrees)
+    constructor() : this(0, 0, 0)
 
     operator fun compareTo(other: Pose): Int {
         return if (x == other.x && y == other.y && rot == other.rot) {

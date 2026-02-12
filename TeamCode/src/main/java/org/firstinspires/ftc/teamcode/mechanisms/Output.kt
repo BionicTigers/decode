@@ -99,9 +99,14 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // )
 
     val velocityMap = interpolatedMapOf(
-        3600.0 to 1980.0,
+        3600.0 to 2100.0,
         2042.0 to 1750.0
     )
+//    val velocityMap2 = interpolatedMapOf(
+//        3044.0 to 2060.0, // 12.1 V
+//        3044.0 to 1950.0,
+
+//        )
 
     @Editable
     var farTarget = 1625.0//1980.0
@@ -114,6 +119,10 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         motor.mode == DcMotor.RunMode.RUN_WITHOUT_ENCODER
         deltaTime += 20.0
     }
+
+    var lastDist = 0.0
+    var lastvel = 0.0
+    var lastvoltage = 0.0
 
     override val update = SystemCommand.continuous("Output Data") {
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
@@ -138,29 +147,34 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         telemetry?.addData("target", targetVelocity)
         telemetry?.addData("velocity", velocity.average)
         telemetry?.addData("power", motor.ePower)
+        telemetry?.addLine("---------------------")
+
 
         if (active) {
-//            if (kicker?.reset ?: false) {
                 motor.ePower = 1.0
                 val currentPos = odometry!!.position
                 val goalPos = if (isRed) redGoalPos else blueGoalPos
-
-                val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
-                val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
-                val closestPoint = closestPointOnLineSegment(
-                    goalPointA,
-                    goalPointB,
-                    currentPos.position
-                )
-
-                val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+//
+//                val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
+//                val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
+//                val closestPoint = closestPointOnLineSegment(
+//                    goalPointA,
+//                    goalPointB,
+//                    currentPos.position
+//                )
+//
+//                val distToGoalWall = (currentPos.position - closestPoint).magnitude()
+                val distToGoalWall = (goalPos.position - currentPos.position).magnitude() - k - 225
                 targetVelocity = velocityMap[distToGoalWall]
-                telemetry?.addData("distToGoalWall", distToGoalWall)
-                telemetry?.addData("last shot vel", velocity.average)
 
                 val error = targetVelocity - velocity.average
                 val rampPower = if (error > 400) 1.0 else 0.0
                 motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+                if (kicker?.reset ?: false) {
+                    lastDist = distToGoalWall
+                    lastvel = velocity.average
+                    lastvoltage = hub.getVoltage()
+                }
 //            } else {
 //                val error = targetVelocity - velocity.average
 //                val rampPower = if (error > 400) 1.0 else 0.0
@@ -169,6 +183,11 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         } else {
             motor.ePower = 0.0
         }
+
+        telemetry?.addData("distToGoalWall", lastDist)
+        telemetry?.addData("last shot vel", lastvel)
+        telemetry?.addData("voltage", lastvoltage)
+        telemetry?.addLine("---------------------")
 
         if (active && velocity.average.eq(targetVelocity, 45.0))
             indcLight.position = .5

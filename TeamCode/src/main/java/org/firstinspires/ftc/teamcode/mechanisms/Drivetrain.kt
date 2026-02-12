@@ -13,6 +13,7 @@ import io.github.bionictigers.axiom.core.input.Gamepads
 import io.github.bionictigers.axiom.core.input.matches
 import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
+import io.github.bionictigers.axiom.core.web.Hidden
 import io.github.bionictigers.axiom.core.web.WebData
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.control.MotionProfile
@@ -37,6 +38,7 @@ import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.withSign
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -59,6 +61,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 
     override val name = "Drivetrain"
 
+    @Hidden
     var speedMultiplier = 1.0
         set(value) {
             xProfile.setConstants(xJerk * value, xMaxAcceleration * value, xMaxVelocity * value)
@@ -98,10 +101,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 
         val K: Matrix = Matrix(
             arrayOf(
-                arrayOf(0.079626121631806, 0.079626121631807, 0.017897507820257, 0.142412262363277, -0.000686597231607, 0.000686597231607, 0.001525436283586),
-                arrayOf(-0.079626121631805, 0.079626121631810, -0.017897507820257, -0.000686597231607, 0.142412262363277, 0.001525436283586, 0.000686597231607),
-                arrayOf(-0.079626121631806, 0.079626121631807, 0.017897507820257, 0.000686597231607, 0.001525436283586, 0.142412262363277, -0.000686597231607),
-                arrayOf(0.079626121631805, 0.079626121631810, -0.017897507820257, 0.001525436283586, 0.000686597231607, -0.000686597231607, 0.142412262363277),
+                arrayOf(0.085305766656032, 0.085305766656036, 0.016022179744041, 0.142498099853715, -0.000614655076519, 0.000614655076519, 0.001755158084200),
+                arrayOf(-0.085305766656032, 0.085305766656037, -0.016022179744041, -0.000614655076519, 0.142498099853715, 0.001755158084200, 0.000614655076519),
+                arrayOf(-0.085305766656032, 0.085305766656036, 0.016022179744041, 0.000614655076519, 0.001755158084200, 0.142498099853715, -0.000614655076519),
+                arrayOf(0.085305766656032, 0.085305766656037, -0.016022179744041, 0.001755158084200, 0.000614655076519, -0.000614655076519, 0.142498099853715),
             )
         )
 
@@ -110,19 +113,27 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
     }
 
     /* We only need to set these if we are using driver control */
+    @Hidden
     var driveOrientation: DriveOrientation? = null
+    @Hidden
     var xControl: Double = 0.0
+    @Hidden
     var yControl: Double = 0.0
+    @Hidden
     var rotControl: Double = 0.0
 
+    @Hidden
     val inTeleop get() = driveOrientation != null
 
+    @Hidden
     val motors = DriveMotors(hardwareMap)
 
 //    val octoQuad = hardwareMap.getByName<OctoQuadFWv3>("octoQuad")
 //    val encoderData = OctoQuadFWv3.EncoderDataBlock()
 
+    @Hidden
     val velocities = MotorValues(0.0, 0.0, 0.0, 0.0)
+    @Hidden
     val rollingAverages = MotorValues(
         RollingAverage(3),
         RollingAverage(3),
@@ -130,25 +141,31 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         RollingAverage(3)
     )
 
+    @Hidden
     val pids = MotorPIDs()
 
+    @Hidden
     val staticFrictionConsts = MotorValues(0.03,0.03,0.03,0.03) // TODO: Update values to new bot
+    @Hidden
     val kineticFrictionConsts = MotorValues(1.0/wheelMaxVel,1.0/wheelMaxVel,1.0/wheelMaxVel,1.0/wheelMaxVel) // TODO: Find realer values
 
 //    var controllerCommand: List<Double> = listOf(0.0, 0.0, 0.0, 0.0)
 //    var timeChanged = TimeSource.Monotonic.markNow()
 
+    @Hidden
     var powers: MotorValues<Double> = MotorValues(0.0, 0.0, 0.0, 0.0)
 
     override val dependencies: List<System> = listOfNotNull(odometry, octoQuad)
 
+    @Hidden
     var max = 0.0
 
+    @Hidden
     var mtp: MoveVariables? = null
 
-    private val headingPID = PID(8.0, 0.0, 0.0, 0, -PI, PI, -1.0, 1.0)
-    private var targetHeading = 0.0
-    private var timeLetGo = TimeSource.Monotonic.markNow()
+//    private val headingPID = PID(8.0, 0.0, 0.0, 0, -PI, PI, -1.0, 1.0)
+//    private var targetHeading = 0.0
+//    private var timeLetGo = TimeSource.Monotonic.markNow()
     private var rotation = 0.0
 
     init {
@@ -167,6 +184,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         octoQuad.octoQuad.setSingleVelocitySampleInterval(3, 10)
     }
 
+    var stuck = false
     override val update = SystemCommand.create("Motor Power Calculation") {
         enter {
             if (inTeleop) {
@@ -227,17 +245,26 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             } else { // auto
                 if (mtp != null) {
                     with(mtp!!) {
-                        if (Pose(odometry!!.position.x, odometry.position.y, odometry.position.rotation.degrees.normalizeDegrees()).within(finalPose, Pose(10,10,2.5))) {
+                        if (Pose(odometry!!.position.x, odometry.position.y, odometry.position.rotation.degrees.normalizeDegrees()).within(finalPose, Pose(30,30,1.0))) {
                             println("position correct")
+                            telemetry?.addLine("position correct")
                             mtp = null
+                        } else if (odometry.velocity.within(Pose(), Pose(1, 1, 1))) {
+                            stuck = true
+                        } else {
+                            stuck = false
                         }
                     }
                 } else {
                     // TODO: Maintain position after move to pos
                 }
             }
+            telemetry?.addData("Velocities", velocities.toString())
+            telemetry?.addData("stuck", stuck)
         }
     }
+
+    fun Double.withSignZero(other: Double) = if (other == 0.0) 0.0 else this.withSign(other)
 
     override val apply = SystemCommand.continuous("Drivetrain Update") {
         if (!inTeleop) {
@@ -245,6 +272,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
                 with(mtp!!) {
 //                    println("pid calculated, ${it.deltaTime} loop time")
                     powers.set(controlState)
+
+                    if (stuck) {
+                        powers.set(
+                            powers[0] + (0.2.withSignZero(powers[0])),
+                            powers[1] + (0.2.withSignZero(powers[1])),
+                            powers[2] + (0.2.withSignZero(powers[2])),
+                            powers[3] + (0.2.withSignZero(powers[3]))
+                        )
+                    }
                     // TODO: add heading pid modifier
 
                     telemetry?.addData("Error", errorState.printSimple())
@@ -256,6 +292,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             }
         }
         motors.setPower(powers)
+        telemetry?.addData("powers", powers)
     }
 
     /**
@@ -299,7 +336,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
     }
 
     var firstRun = true
-    fun calculateLQR() = Command.create("LQR Calculation", interval = 20.milliseconds) {
+    fun calculateLQR() = Command.create("LQR Calculation") {
         enter {
             println("LQR start")
             firstRun = true
@@ -342,14 +379,22 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         }
     }
 
+    var xGlobal = 0.0
+    var yGlobal = 0.0
+    var rot = 0.0
+    var theta = 0.0
+    var x = 0.0
+    var y = 0.0
+    var vx = 0.0
+    var vy = 0.0
     fun getErrorState(time: Duration): Matrix {
         val currentPose = odometry!!.position
         val currentVelocity = odometry.velocity
 
         with (mtp!!) { // odo values are in mm and mm/s, need to swap to m for LQR calculations
-            val xGlobal = currentPose.x/1000 - (xResult.getPosition(time))
-            val yGlobal = currentPose.y/1000 - (yResult.getPosition(time))
-            val rot = currentPose.radians - (angularResult.getPosition(time))
+            xGlobal = currentPose.x/1000 - (xResult.getPosition(time))
+            yGlobal = currentPose.y/1000 - (yResult.getPosition(time))
+            rot = currentPose.radians - (angularResult.getPosition(time))
 
             // convert global deltas to local deltas so LQR dynamics stay linear
 
@@ -359,11 +404,16 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 //            val x = h * sin(a)
 //            val y = h * cos(a)
 
-            val theta = currentPose.radians
+            theta = currentPose.radians
 
-            val x =  xGlobal * cos(theta) + yGlobal * sin(theta)
-            val y = -xGlobal * sin(theta) + yGlobal * cos(theta)
+            x = xGlobal * cos(-theta) + yGlobal * sin(-theta)
+            y = xGlobal * sin(theta) + yGlobal * cos(theta)
 
+            telemetry?.addData("xGlobal", xGlobal)
+            telemetry?.addData("yGlobal", xGlobal)
+
+            telemetry?.addData("x", x)
+            telemetry?.addData("y", y)
 
 //            println(angularResult.getPosition(time))
 //            val vx = currentVelocity.x/1000 - (xResult.getVelocity(time))
@@ -372,8 +422,8 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 
             // get vel linear is in mm/s i want m, botToWheelVels gives rad/s
 
-            val vx =  xResult.getVelocity(time)/1000 * cos(theta) + yResult.getVelocity(time)/1000 * sin(theta)
-            val vy = -xResult.getVelocity(time)/1000 * sin(theta) + yResult.getVelocity(time)/1000 * cos(theta)
+            vx = xResult.getVelocity(time)/1000 * cos(-theta) + yResult.getVelocity(time)/1000 * sin(-theta)
+            vy = xResult.getVelocity(time)/1000 * sin(theta) + yResult.getVelocity(time)/1000 * cos(theta)
 
             val targetW = botToWheelVels(Pose(vx, vy, angularResult.getVelocity(time)))
             telemetry?.addData("targetW", targetW.toString())
