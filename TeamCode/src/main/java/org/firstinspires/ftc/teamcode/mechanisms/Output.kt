@@ -99,8 +99,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // )
 
     val velocityMap = interpolatedMapOf(
-        3600.0 to 1625.0,
-        2042.0 to 1430.0
+        3600.0 to 1980.0,
+        2042.0 to 1750.0
     )
 
     @Editable
@@ -140,7 +140,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         telemetry?.addData("power", motor.ePower)
 
         if (active) {
-            if (kicker?.reset ?: false) {
+//            if (kicker?.reset ?: false) {
                 motor.ePower = 1.0
                 val currentPos = odometry!!.position
                 val goalPos = if (isRed) redGoalPos else blueGoalPos
@@ -157,11 +157,15 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
                 targetVelocity = velocityMap[distToGoalWall]
                 telemetry?.addData("distToGoalWall", distToGoalWall)
                 telemetry?.addData("last shot vel", velocity.average)
-            } else {
+
                 val error = targetVelocity - velocity.average
                 val rampPower = if (error > 400) 1.0 else 0.0
                 motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
-            }
+//            } else {
+//                val error = targetVelocity - velocity.average
+//                val rampPower = if (error > 400) 1.0 else 0.0
+//                motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+//            }
         } else {
             motor.ePower = 0.0
         }
@@ -178,53 +182,39 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     }
 
     override val apply = SystemCommand.continuous("Turret Auto Aim") {
-        if (odometry != null) {
-            deltaTime += it.deltaTime.milliseconds
-
-            // Static target position in mm
-            val targetX = 3352.8 + 300
-            val targetY = 0
-
-            // predicted position
-            var predictedPose = Pose(
-                odometry.position.x + odometry.velocity.x * deltaTime.average,
-                odometry.position.y + odometry.velocity.y * deltaTime.average,
-                odometry.position.radians + odometry.velocity.radians * deltaTime.average
-            )
-            predictedPose = Pose(
-                odometry.position.x,
-                odometry.position.y,
-                odometry.position.radians
-            )
-
-            // Calculate angle from robot to target in field coordinates
-            // Using atan2(deltaX, deltaY) because robot heading 0° = positive Y, 90° = positive X
-            val deltaX = targetX - predictedPose.x
-            val deltaY = targetY - predictedPose.y
-            val angleToTarget = atan2(deltaX, deltaY) // radians
-
-            // Get robot's current heading in radians
-            val robotHeading = predictedPose.radians
-
-            // Calculate relative angle (how much turret needs to turn from robot's forward direction)
-            var relativeAngle = angleToTarget - robotHeading
-
-            // Normalize to [-π, π] so turret takes the shortest path
-            while (relativeAngle > PI) relativeAngle -= 2 * PI
-            while (relativeAngle < -PI) relativeAngle += 2 * PI
-
-            // Convert to servo position
-            // At 0.5, turret is aligned with robot's forward direction (0 relative angle)
-            // 90° servo range: -45° (servo 0.0) to +45° (servo 1.0)
-            val servoPosition = (0.5 - ((relativeAngle) / (PI / 3))).coerceIn(0.1, 0.9)
-
-            telemetry?.addData("Angle", Math.toDegrees(relativeAngle))
-            telemetry?.addData("Servo Position", servoPosition)
-
-            turret.position = servoPosition
-        } else {
-            turret.position = 0.5
+        if (odometry == null) {
+            return@continuous
         }
+//        // Static target position in mm
+        val targetX = 3352.8 + 300
+        val targetY = 0
+
+        // Calculate angle from robot to target in field coordinates
+        // Using atan2(deltaX, deltaY) because robot heading 0° = positive Y, 90° = positive X
+        val deltaX = targetX - odometry.position.x
+        val deltaY = targetY - odometry.position.y
+        val angleToTarget = atan2(deltaX, deltaY) // radians
+
+        // Get robot's current heading in radians
+        val robotHeading = odometry.position.radians
+
+        // Calculate relative angle (how much turret needs to turn from robot's forward direction)
+        var relativeAngle = angleToTarget - robotHeading
+
+        // Normalize to [-π, π] so turret takes the shortest path
+        while (relativeAngle > PI) relativeAngle -= 2 * PI
+        while (relativeAngle < -PI) relativeAngle += 2 * PI
+
+        // Convert to servo position
+        // At 0.5, turret is aligned with robot's forward direction (0 relative angle)
+        // 90° servo range: -45° (servo 0.0) to +45° (servo 1.0)
+        val servoPosition = (0.5 - ((relativeAngle) / (PI / 3))).coerceIn(0.1, 0.9)
+
+        telemetry?.addData("Angle", Math.toDegrees(relativeAngle))
+        telemetry?.addData("Servo Position", servoPosition)
+
+        turret.position = servoPosition
+//        turret.position = 0.5
     }
 
     fun vectorToSegment(t: Double, a: Vector2, b: Vector2, p: Vector2): Vector2 {
