@@ -99,8 +99,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // )
 
     val velocityMap = interpolatedMapOf(
-        3600.0 to 2300.0,
-        2042.0 to 2150.0
+        3600.0 to 2230.0,
+        2042.0 to 1900.0
     )
 //    val velocityMap2 = interpolatedMapOf(
 //        3044.0 to 2060.0, // 12.1 V
@@ -169,6 +169,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             val error = targetVelocity - velocity.average
             val rampPower = if (error > 400) 1.0 else 0.0
             motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+            println(pid.compute(velocity.average, targetVelocity) + rampPower)
             if (kicker?.reset ?: false) {
                 lastDist = distToGoalWall
                 lastvel = velocity.average
@@ -231,7 +232,10 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         telemetry?.addData("Angle", Math.toDegrees(relativeAngle))
         telemetry?.addData("Servo Position", servoPosition)
 
-        turret.position = servoPosition
+        if (isRed)
+            turret.position = servoPosition
+        else
+            turret.position = servoPosition + .02
 //        turret.position = 0.5
     }
 

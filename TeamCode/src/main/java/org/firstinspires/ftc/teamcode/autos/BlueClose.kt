@@ -26,196 +26,11 @@ import org.firstinspires.ftc.teamcode.utils.Pose
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
-
-/*
-{
- "version": 1,
- "units": "mm",
- "fieldSize": {
-   "width": 3657.6,
-   "height": 3657.6
- },
- "startPose": {
-   "xMm": 1205.693952003203,
-   "yMm": 2742.2484920143665,
-   "headingDeg": -90
- },
- "waypoints": {
-   "Start": {
-     "xMm": 1543.659364311818,
-     "yMm": 3435.2183881959845,
-     "headingDeg": -90
-   },
-   "QueueClose": {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": 180
-   },
-   "GrabClose": {
-     "xMm": 407.64117167781785,
-     "yMm": 2739.408451456245,
-     "headingDeg": -180
-   },
-   "QueueMiddle": {
-     "xMm": 1211.374042966373,
-     "yMm": 2125.959690902026,
-     "headingDeg": -90
-   },
-   "GrabMiddle": {
-     "xMm": 390.60089878830775,
-     "yMm": 2128.7997314601475,
-     "headingDeg": -90
-   },
-   "ShootClose": {
-     "xMm": 1830.5039579519032,
-     "yMm": 1796.5149861599455,
-     "headingDeg": -90
-   },
-   "QueueFar": {
-     "xMm": 989.8504954027429,
-     "yMm": 1509.6708897896856,
-     "headingDeg": -90
-   },
-   "GrabFar": {
-     "xMm": 384.9208078251378,
-     "yMm": 1523.8710925802923,
-     "headingDeg": -85
-   }
- },
- "moves": [
-   {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": -170
-   },
-   {
-     "xMm": 407.64117167781785,
-     "yMm": 2739.408451456245,
-     "headingDeg": -180
-   },
-   {
-     "xMm": 1540.819318830233,
-     "yMm": 3432.378347637863,
-     "headingDeg": -180
-   },
-   {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": 180
-   },
-   {
-     "xMm": 1543.659364311818,
-     "yMm": 3435.2183881959845,
-     "headingDeg": -90
-   },
-   {
-     "xMm": 1543.659364311818,
-     "yMm": 3429.5383070797416,
-     "headingDeg": -90
-   },
-   {
-     "xMm": 1211.374042966373,
-     "yMm": 2125.959690902026,
-     "headingDeg": 180
-   },
-   {
-     "xMm": 390.60089878830775,
-     "yMm": 2128.7997314601475,
-     "headingDeg": 20
-   },
-   {
-     "xMm": 1830.5039579519032,
-     "yMm": 1796.5149861599455,
-     "headingDeg": -80
-   },
-   {
-     "xMm": 989.8504954027429,
-     "yMm": 1509.6708897896856,
-     "headingDeg": -85
-   },
-   {
-     "xMm": 384.9208078251378,
-     "yMm": 1523.8710925802923,
-     "headingDeg": -85
-   },
-   {
-     "xMm": 1827.663912470318,
-     "yMm": 1790.8349050437025,
-     "headingDeg": -85
-   },
-   {
-     "xMm": 1543.659364311818,
-     "yMm": 3435.2183881959845,
-     "headingDeg": -90
-   },
-   {
-     "xMm": 1543.659364311818,
-     "yMm": 3435.2183881959845,
-     "headingDeg": -90
-   },
-   {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": 180
-   },
-   {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": 180
-   },
-   {
-     "xMm": 1205.693952003203,
-     "yMm": 2742.2484920143665,
-     "headingDeg": 180
-   },
-   {
-     "xMm": 407.64117167781785,
-     "yMm": 2739.408451456245,
-     "headingDeg": -180
-   },
-   {
-     "xMm": 390.60089878830775,
-     "yMm": 2128.7997314601475,
-     "headingDeg": -90
-   }
- ],
- "robotSize": {
-   "widthMm": 457.2,
-   "heightMm": 457.2
- }
-}
-*/
-
-
-/*
-   Shoot Routine:
-       Move to start / close Pose
-       Set Transfer to Output Position
-       Spin up Shooter
-       Wait for velocity to reach far / close threshold
-       Repeat x3: Ignore the rotate if on final loop
-       Check has Ball:
-           True:
-               Kick Ball
-               Rotate transfer to next ball
-           False:
-               Rotate transfer to next ball
-
-   Pickup Routine:
-       Move to queue pose
-       Set Transfer to Intake Positon
-       Spin intake
-       Drive at 30% speed
-       Whenever color sensor reads, move to next empty slot
-
-   Main Routine:
-
-*/
 @Autonomous
-class BlueFar : LinearOpMode() {
-    private val startPose = Pose(Distance.inch(9).mm, 609.6 * 3.5, 90)
+class BlueClose : LinearOpMode() {
+    private val startPose = Pose(609.6 * (5+1/5), 609.6 * 5, 45)
     private val farShootPose = Pose(Distance.inch(20).mm, 609.6 * 3.5, 60)
-    private val shootClosePose = Pose(609.6 * 3.5, 609.6 * 3.5, 90 - 45)
+    private val shootClosePose = Pose(609.6 * 3, 609.6 * 3.5, 90 - 45)
     private val queueClosePose = Pose(609.6 * 1.5, 609.6 * 4, 0)
     private val grabClosePose = Pose(609.6 * 1.5, 609.6 * 5.5, 0)
     private val queueMiddlePose = Pose(1211.37, 2125.95, 0)
@@ -253,7 +68,7 @@ class BlueFar : LinearOpMode() {
                         output = output,
                         sorter = sorter,
                         kicker = kicker,
-                        shootPose = farShootPose,
+                        shootPose = shootClosePose,
                         useCloseVelocity = false
                     )
                 )
@@ -299,7 +114,15 @@ class BlueFar : LinearOpMode() {
                         useCloseVelocity = true
                     )
                 )
-                add(moveToPoseFactory("Park", drivetrain, queueClosePose, speed = 1.0, timeoutMs = 3000))
+                add(
+                    moveToPoseFactory(
+                        "Park",
+                        drivetrain,
+                        queueClosePose,
+                        speed = 1.0,
+                        timeoutMs = 3000
+                    )
+                )
                 add(
                     BtAction("Shutdown") {
                         Scheduler.schedule(output.stop())
@@ -340,7 +163,7 @@ class BlueFar : LinearOpMode() {
         shootPose: Pose,
         useCloseVelocity: Boolean
     ): BtCommand<*> {
-        return Sequence(
+        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
             name,
             listOf(
                 pickupRoutineFactory(
@@ -374,10 +197,16 @@ class BlueFar : LinearOpMode() {
         queuePose: Pose,
         grabPose: Pose
     ): BtCommand<*> {
-        return Sequence(
+        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
             name,
             listOf(
-                moveToPoseFactory("$name Queue Move", drivetrain, queuePose, speed = 0.5, timeoutMs = 2600),
+                moveToPoseFactory(
+                    "$name Queue Move",
+                    drivetrain,
+                    queuePose,
+                    speed = 0.5,
+                    timeoutMs = 2600
+                ),
                 BtAction("$name Intake Setup") {
                     sorter.isOutput = false
 //                    sorter.move()
@@ -385,7 +214,13 @@ class BlueFar : LinearOpMode() {
                     Scheduler.schedule(intake.intake())
                     succeed()
                 },
-                moveToPoseFactory("$name Grab Move", drivetrain, grabPose, speed = 0.35, timeoutMs = 3200),
+                moveToPoseFactory(
+                    "$name Grab Move",
+                    drivetrain,
+                    grabPose,
+                    speed = 0.35,
+                    timeoutMs = 3200
+                ),
                 intakeFillRoutineFactory(
                     name = "$name Fill Transfer",
                     sorter = sorter,
@@ -411,23 +246,30 @@ class BlueFar : LinearOpMode() {
         shots: Int = 3
     ): BtCommand<*> {
         val children = mutableListOf<BtCommand<*>>(
-            Parallel("$name Shooter Move", children = listOf(
-                moveToPoseFactory(
-                    "$name Drive",
-                    drivetrain,
-                    shootPose,
-                    speed = 1.0,
-                    timeoutMs = 3200
-                ),
-                BtAction("$name Shooter Setup") {
-                    sorter.isOutput = true
-                    sorter.move()
-                    Scheduler.schedule(output.shoot())
-                    succeed()
-                },
-            ), ParallelPolicy.REQUIRE_ONE),
+            Parallel(
+                "$name Shooter Move", children = listOf(
+                    moveToPoseFactory(
+                        "$name Drive",
+                        drivetrain,
+                        shootPose,
+                        speed = 0.8,
+                        timeoutMs = 3200
+                    ),
+                    BtAction("$name Shooter Setup") {
+                        sorter.isOutput = true
+                        sorter.move()
+                        Scheduler.schedule(output.shoot())
+                        succeed()
+                    },
+                ), ParallelPolicy.REQUIRE_ONE
+            ),
             Wait("$name Shooter Settle", 3000.milliseconds),
-            waitForShooterVelocityFactory("$name Velocity Wait", output, tolerance = 60.0, timeoutMs = 1500)
+            waitForShooterVelocityFactory(
+                "$name Velocity Wait",
+                output,
+                tolerance = 60.0,
+                timeoutMs = 1500
+            )
         )
 
         if (shots > 1) {
@@ -445,7 +287,7 @@ class BlueFar : LinearOpMode() {
             succeed()
         }
 
-        return Sequence(name, children)
+        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(name, children)
     }
 
     private fun singleShotFactory(
@@ -454,7 +296,7 @@ class BlueFar : LinearOpMode() {
         sorter: Sorter,
         rotateAfter: Boolean
     ): BtCommand<*> {
-        return Sequence(
+        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
             name,
             listOf(
                 Selector(
