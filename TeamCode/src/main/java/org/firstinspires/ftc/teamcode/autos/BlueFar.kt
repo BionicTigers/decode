@@ -4,12 +4,15 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import io.github.bionictigers.axiom.core.commands.bt.BtCommand
 import io.github.bionictigers.axiom.core.commands.bt.behaviorTree
+import io.github.bionictigers.axiom.core.commands.bt.composites.Parallel
+import io.github.bionictigers.axiom.core.commands.bt.composites.ParallelPolicy
 import io.github.bionictigers.axiom.core.commands.bt.composites.Selector
 import io.github.bionictigers.axiom.core.commands.bt.composites.Sequence
 import io.github.bionictigers.axiom.core.commands.bt.decorators.Repeater
 import io.github.bionictigers.axiom.core.commands.bt.leaves.BtAction
 import io.github.bionictigers.axiom.core.commands.bt.leaves.Condition
 import io.github.bionictigers.axiom.core.commands.bt.leaves.Wait
+import io.github.bionictigers.axiom.core.commands.bt.traced
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
@@ -211,7 +214,8 @@ import kotlin.time.Duration.Companion.milliseconds
 @Autonomous
 class BlueFar : LinearOpMode() {
     private val startPose = Pose(Distance.inch(9).mm, 609.6 * 3.5, 90)
-    private val shootClosePose = Pose(609.6 * 3.5, 609.6 * 3.5, 90 + 45)
+    private val farShootPose = Pose(Distance.inch(11).mm, 609.6 * 3.5, 60)
+    private val shootClosePose = Pose(609.6 * 3.5, 609.6 * 3.5, 90 - 45)
     private val queueClosePose = Pose(609.6 * 1.5, 609.6 * 4, 0)
     private val grabClosePose = Pose(609.6 * 1.5, 609.6 * 5.5, 0)
     private val queueMiddlePose = Pose(1211.37, 2125.95, 0)
@@ -228,7 +232,7 @@ class BlueFar : LinearOpMode() {
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
         val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
 
-        kicker.servo.position = 0.5
+        kicker.servo.position = .35
 
         Scheduler.telemetry = telemetry
         Scheduler.schedule(octoQuad, odometry, drivetrain, intake, kicker, sorter, output)
@@ -236,13 +240,20 @@ class BlueFar : LinearOpMode() {
         val autoTree = behaviorTree("BlueFar Auto") {
             sequence("Main Routine") {
                 add(
+                    BtAction {
+                        sorter.isOutput = true
+                        Scheduler.schedule(sorter.moveForward())
+                        succeed()
+                    }
+                )
+                add(
                     shootRoutineFactory(
                         name = "Preload Shoot",
                         drivetrain = drivetrain,
                         output = output,
                         sorter = sorter,
                         kicker = kicker,
-                        shootPose = startPose,
+                        shootPose = farShootPose,
                         useCloseVelocity = false
                     )
                 )
@@ -297,7 +308,7 @@ class BlueFar : LinearOpMode() {
                     }
                 )
             }
-        }
+        }.traced()
 
         waitForStart()
         if (isStopRequested) {
@@ -305,11 +316,11 @@ class BlueFar : LinearOpMode() {
             return
         }
 
-        Scheduler.schedule(autoTree.root)
+        Scheduler.schedule(autoTree)
 
         while (opModeIsActive()) {
             Scheduler.tick()
-            telemetry.addData("Auto Node Status", autoTree.root.status)
+            telemetry.addData("Auto Node Status", autoTree.treeStatus)
             telemetry.addData("Transfer Occupied", sorter.occupiedBays)
             telemetry.update()
         }
@@ -400,18 +411,22 @@ class BlueFar : LinearOpMode() {
         shots: Int = 3
     ): BtCommand<*> {
         val children = mutableListOf<BtCommand<*>>(
-            moveToPoseFactory("$name Drive", drivetrain, shootPose, speed = 1.0, timeoutMs = 3200),
-            BtAction("$name Shooter Setup") {
-                sorter.isOutput = true
-                sorter.move()
-                if (useCloseVelocity) {
-                    Scheduler.schedule(output.shootClose())
-                } else {
+            Parallel("$name Shooter Move", children = listOf(
+                moveToPoseFactory(
+                    "$name Drive",
+                    drivetrain,
+                    shootPose,
+                    speed = 1.0,
+                    timeoutMs = 3200
+                ),
+                BtAction("$name Shooter Setup") {
+                    sorter.isOutput = true
+                    sorter.move()
                     Scheduler.schedule(output.shoot())
-                }
-                succeed()
-            },
-            Wait("$name Shooter Settle", 200.milliseconds),
+                    succeed()
+                },
+            ), ParallelPolicy.REQUIRE_ONE),
+            Wait("$name Shooter Settle", 1000.milliseconds),
             waitForShooterVelocityFactory("$name Velocity Wait", output, tolerance = 60.0, timeoutMs = 1400)
         )
 
@@ -461,14 +476,14 @@ class BlueFar : LinearOpMode() {
                         BtAction("$name Skip Kick") { succeed() }
                     )
                 ),
-                Wait("$name Kick Hold", 320.milliseconds),
+                Wait("$name Kick Hold", 400.milliseconds),
                 BtAction("$name Rotate Transfer") {
                     if (rotateAfter) {
                         Scheduler.schedule(sorter.moveForward())
                     }
                     succeed()
                 },
-                Wait("$name Transfer Hold", 200.milliseconds)
+                Wait("$name Transfer Hold", 1200.milliseconds)
             )
         )
     }
@@ -484,7 +499,7 @@ class BlueFar : LinearOpMode() {
         return BtAction(name) {
             if (!started) {
                 started = true
-                Scheduler.schedule(drivetrain.moveToPosition(targetPose))
+                Scheduler.schedule(drivetrain.moveToPosition(targetPose, speed))
                 // Skip checking mtp on the first tick — the moveToPosition
                 // command's enter{} hasn't run yet so mtp is still null.
                 return@BtAction
@@ -498,7 +513,7 @@ class BlueFar : LinearOpMode() {
             if (meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds) {
                 println("move failed")
 //                drivetrain.mtp = null
-                fail()
+                succeed()
             }
         }
     }

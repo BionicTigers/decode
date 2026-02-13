@@ -132,11 +132,11 @@ class Sorter(
 
     // Runtime buffers
     private var junkTicks = octoQuad.encoderData.position[5]
-    val colors: MutableList<BallColor> = MutableList(3) { BallColor.None }
+    val colors: MutableList<BallColor> = MutableList(3) { BallColor.Purple }
 
-    @Editable var kG = 0.067
+    @Editable var kG = 0.072
     @Editable
-    val pid: PID = PID(1.3, 0.0, 0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds)
+    val pid: PID = PID(1.3, 3, 0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds)
 //    @Editable var kS: Double = 0.01
 //    @Editable var kV: Double = 0.0007
 //    @Editable var kA: Double = 0.0
@@ -149,7 +149,7 @@ class Sorter(
     )
     @Editable
     @Hidden
-    var offset = -25.0
+    var offset = -15.0
     @Hidden
     var currentProfile: MotionResult? = null
     @Hidden

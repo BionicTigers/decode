@@ -245,8 +245,9 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             } else { // auto
                 if (mtp != null) {
                     with(mtp!!) {
+                        println("${odometry!!.position} and ${finalPose}")
                         if (Pose(
-                                odometry!!.position.x,
+                                odometry.position.x,
                                 odometry.position.y,
                                 odometry.position.rotation.degrees.normalizeDegrees()
                         ).within(finalPose, Pose(30,30,1.0))) {
@@ -308,11 +309,12 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         enter {
             println("mtp")
             speedMultiplier = speed
-            val currentPose = Pose(odometry!!.position.x/1000, odometry.position.y/1000, odometry.position.radians)
+            val currentPose = Pose(odometry!!.position.x/1000, odometry.position.y/1000, odometry.position.rotation)
             val targetPose = Pose(target.x/1000, target.y/1000, Angle.radians(target.radians))
             println(currentPose)
             println(targetPose)
-            val targetAngle = denormalizeTargetAngle(target.rotation)
+            val currentAngle = currentPose.rotation
+            val targetAngle = denormalizeTargetAngle(currentAngle, target.rotation)
             println(targetAngle)
 
             mtp = MoveVariables(
@@ -320,7 +322,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
                 targetPose = targetPose,
                 xResult = xProfile.generate(currentPose.x, targetPose.x),
                 yResult = yProfile.generate(currentPose.y, targetPose.y),
-                angularResult = angularProfile.generate(0.0, targetAngle.radians),
+                angularResult = angularProfile.generate(currentAngle.radians, targetAngle.radians),
                 startTime = it.enteredAt,
                 errorState = emptyMatrix(),
                 controlState = emptyMatrix()
@@ -435,7 +437,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             telemetry?.addData("targetW", targetW.toString())
 
             // velocities are in ticks/10ms :( I want rad/s!!!!!!!
-            val conv = 1/ticksPerRev * (2*PI) + (1/.01)
+            val conv = 1/ticksPerRev * (2*PI) * (1/.01)
 
             val wfl = (velocities.frontLeft*conv) - targetW.frontLeft
             val wfr = (velocities.frontRight*conv) - targetW.frontRight
@@ -489,7 +491,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 
     fun updateVelocities() {
         rollingAverages.forEachIndexed { index, it ->
-            it += octoQuad.encoderData.velocity[index].toDouble() * 1/384.5 * 1000 // ticks/10ms to rev/s
+//            it += octoQuad.encoderData.velocity[index].toDouble() // ticks/10ms (raw from OctoQuad)
             velocities[index] = it.average
         }
     }
@@ -547,13 +549,14 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         }
     }
 
-    fun denormalizeTargetAngle(target: Angle) : Angle {
-        return Angle.radians(
-            -atan2(
-                sin(Angle.degrees(0.0.normalizeDegrees() - target.degrees).radians),
-                cos(Angle.degrees(0.0.normalizeDegrees() - target.degrees).radians)
-            )
+    fun denormalizeTargetAngle(current: Angle, target: Angle) : Angle {
+        // Pick the equivalent target angle closest to current so the profile
+        // takes the shortest rotation path (no long-way-around).
+        val shortestDelta = atan2(
+            sin(target.radians - current.radians),
+            cos(target.radians - current.radians)
         )
+        return Angle.radians(current.radians + shortestDelta)
     }
 
     fun stopMotors() = motors.setPower(0.0, 0.0, 0.0, 0.0)

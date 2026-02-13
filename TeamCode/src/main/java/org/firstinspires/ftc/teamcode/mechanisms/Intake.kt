@@ -35,11 +35,11 @@ class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Contro
     var active: Boolean = false
     var velocity = RollingAverage(3)
     @Editable
-    var targetVelocity = 2700.0
+    var targetVelocity = 30000.0
     private val velocitySampleIntervalMs = 20
 
     @Editable
-    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 2700.0, -1.0, 1.0)
+    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 30000.0, -1.0, 1.0)
     @Editable
     var ff = .00075
 

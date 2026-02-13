@@ -99,8 +99,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // )
 
     val velocityMap = interpolatedMapOf(
-        3600.0 to 2100.0,
-        2042.0 to 1750.0
+        3600.0 to 2300.0,
+        2042.0 to 2150.0
     )
 //    val velocityMap2 = interpolatedMapOf(
 //        3044.0 to 2060.0, // 12.1 V
@@ -151,9 +151,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 
 
         if (active) {
-                motor.ePower = 1.0
-                val currentPos = odometry!!.position
-                val goalPos = if (isRed) redGoalPos else blueGoalPos
+            val currentPos = odometry!!.position
+            val goalPos = if (isRed) redGoalPos else blueGoalPos
 //
 //                val goalPointA = if (isRed) redGoalPos.position + Vector2(0, 720) else blueGoalPos.position + Vector2(720, 0)
 //                val goalPointB = if (isRed) redGoalPos.position + Vector2(720, 0) else blueGoalPos.position + Vector2(0, 720)
@@ -164,17 +163,17 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 //                )
 //
 //                val distToGoalWall = (currentPos.position - closestPoint).magnitude()
-                val distToGoalWall = (goalPos.position - currentPos.position).magnitude() - k - 225
-                targetVelocity = velocityMap[distToGoalWall]
+            val distToGoalWall = (goalPos.position - currentPos.position).magnitude()
+            targetVelocity = velocityMap[distToGoalWall]
 
-                val error = targetVelocity - velocity.average
-                val rampPower = if (error > 400) 1.0 else 0.0
-                motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
-                if (kicker?.reset ?: false) {
-                    lastDist = distToGoalWall
-                    lastvel = velocity.average
-                    lastvoltage = hub.getVoltage()
-                }
+            val error = targetVelocity - velocity.average
+            val rampPower = if (error > 400) 1.0 else 0.0
+            motor.ePower = pid.compute(velocity.average, targetVelocity) + rampPower
+            if (kicker?.reset ?: false) {
+                lastDist = distToGoalWall
+                lastvel = velocity.average
+                lastvoltage = hub.getVoltage()
+            }
 //            } else {
 //                val error = targetVelocity - velocity.average
 //                val rampPower = if (error > 400) 1.0 else 0.0
@@ -205,8 +204,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             return@continuous
         }
 //        // Static target position in mm
-        val targetX = 3352.8 + 300
-        val targetY = 0
+        val targetX = if (isRed) redGoalPos.x else blueGoalPos.x
+        val targetY = if (isRed) redGoalPos.y else blueGoalPos.y
 
         // Calculate angle from robot to target in field coordinates
         // Using atan2(deltaX, deltaY) because robot heading 0° = positive Y, 90° = positive X
@@ -308,13 +307,11 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 
     fun shoot() = SystemCommand.instant("Output Enable Far Target") {
 //        motor.power = .83
-        targetVelocity = farTarget
         active = true
     }
 
     fun shootClose() = SystemCommand.instant("Output Enable Close Target") {
 //        motor.power = .73
-        targetVelocity = closeTarget
         active = true
     }
 
