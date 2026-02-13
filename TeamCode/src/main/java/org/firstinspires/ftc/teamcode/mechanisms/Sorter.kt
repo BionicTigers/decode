@@ -44,6 +44,8 @@ class Sorter(
     override val dependencies = listOf(octoQuad)
 
     companion object {
+        private const val AUTO_TRANSFER_DELAY_SECONDS = 0.3
+
         val jerk = listOf(
             15000,
             13000,
@@ -147,7 +149,7 @@ class Sorter(
     )
     @Editable
     @Hidden
-    var offset = -40.0
+    var offset = -25.0
     @Hidden
     var currentProfile: MotionResult? = null
     @Hidden
@@ -162,6 +164,8 @@ class Sorter(
     // Gravity Feed Forward
     var ffg = 0.0
     private var lastSeenIntakeColor: BallColor = BallColor.None
+    private var autoTransferPending = false
+    private var autoTransferElapsedSeconds = 0.0
 
     init {
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
@@ -190,8 +194,8 @@ class Sorter(
         val green = colorSensor.green()
         val blue = colorSensor.blue()
 
-        val isGreen = green > red && green > blue - 100 && green > 300
-        val isPurple = blue > red && blue > green && blue > 300
+        val isGreen = green > red && green > blue - 100 && green > 200
+        val isPurple = blue > red && blue > green && blue > 150
         val detectedColor = when {
             isGreen -> BallColor.Green
             isPurple -> BallColor.Purple
@@ -204,10 +208,21 @@ class Sorter(
         telemetry?.addData("green?", isGreen)
         telemetry?.addData("purple?", isPurple)
 
+        if (autoTransferPending) {
+            autoTransferElapsedSeconds += dt
+            if (autoTransferElapsedSeconds >= AUTO_TRANSFER_DELAY_SECONDS) {
+                rotateForwardOneStep()
+                autoTransferPending = false
+                autoTransferElapsedSeconds = 0.0
+            }
+        }
+
         // Track which ball is currently in the transfer intake position.
         // We only latch on a rising edge (None -> Color) to avoid noise/flapping writes.
         if (detectedColor != BallColor.None && lastSeenIntakeColor == BallColor.None) {
             colors[slotIndexForPosition(SlotPosition.Intake)] = detectedColor
+            autoTransferPending = true
+            autoTransferElapsedSeconds = 0.0
         }
         lastSeenIntakeColor = detectedColor
 
@@ -284,12 +299,20 @@ class Sorter(
     }
 
     fun moveForward() = SystemCommand.instant("sorter increment") {
-        step = (step + 1) % 3
-        move()
+        rotateForwardOneStep()
     }
 
     fun moveBackward() = SystemCommand.instant("sorter decrement") {
+        rotateBackwardOneStep()
+    }
+
+    private fun rotateBackwardOneStep() {
         step = (step + 2) % 3
+        move()
+    }
+
+    private fun rotateForwardOneStep() {
+        step = (step + 1) % 3
         move()
     }
 

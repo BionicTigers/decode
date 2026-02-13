@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.utils.Pose
 
 @Autonomous
 class BlueFarr: LinearOpMode() {
-    val startPose = Pose(0, 0, 0)
-    val endPose = Pose(0, 1800, Angle.degrees(180))
+    val startPose = Pose(234, 2254, 90)
+    val endPose = Pose(914, 2438, Angle.degrees(0))
 
     override fun runOpMode() {
         val odometry = Odometry(hardwareMap, telemetry, startPose)
@@ -31,10 +31,10 @@ class BlueFarr: LinearOpMode() {
 //        Scheduler.schedule(odometry, drivetrain, intake, kicker, sorter, output)
         Scheduler.schedule(odometry, drivetrain)
 
+        waitForStart()
 
         Scheduler.schedule(drivetrain.moveToPosition(endPose))
 
-        waitForStart()
 //        sorter.move()
 
         while (opModeIsActive()) {

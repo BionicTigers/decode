@@ -245,15 +245,21 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             } else { // auto
                 if (mtp != null) {
                     with(mtp!!) {
-                        if (Pose(odometry!!.position.x, odometry.position.y, odometry.position.rotation.degrees.normalizeDegrees()).within(finalPose, Pose(30,30,1.0))) {
+                        if (Pose(
+                                odometry!!.position.x,
+                                odometry.position.y,
+                                odometry.position.rotation.degrees.normalizeDegrees()
+                        ).within(finalPose, Pose(30,30,1.0))) {
                             println("position correct")
                             telemetry?.addLine("position correct")
                             mtp = null
-                        } else if (odometry.velocity.within(Pose(), Pose(1, 1, 1))) {
+                        } else if (odometry.velocity.within(Pose(), Pose(5, 5, 5))) {
                             stuck = true
                         } else {
                             stuck = false
                         }
+                        telemetry?.addData("currentPose", odometry.position)
+                        telemetry?.addData("targetPose", finalPose)
                     }
                 } else {
                     // TODO: Maintain position after move to pos
