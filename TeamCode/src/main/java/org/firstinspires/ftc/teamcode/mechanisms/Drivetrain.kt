@@ -302,6 +302,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         telemetry?.addData("powers", powers)
     }
 
+    var xSign = 0.0
+    var ySign = 0.0
+    var rotSign = 0.0
+
     /**
      * @param speed percentage of normal speed, 0 to 1
      */
@@ -316,6 +320,9 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             val currentAngle = currentPose.rotation
             val targetAngle = denormalizeTargetAngle(currentAngle, target.rotation)
             println(targetAngle)
+            xSign = sign(targetPose.x - currentPose.x)
+            ySign = sign(targetPose.y - currentPose.y)
+            rotSign = sign(targetPose.radians - currentPose.radians)
 
             mtp = MoveVariables(
                 finalPose = target,
@@ -430,10 +437,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 
             // get vel linear is in mm/s i want m, botToWheelVels gives rad/s
 
-            vx = xResult.getVelocity(time)/1000 * cos(-theta) + yResult.getVelocity(time)/1000 * sin(-theta)
-            vy = xResult.getVelocity(time)/1000 * sin(theta) + yResult.getVelocity(time)/1000 * cos(theta)
+            vx = xResult.getVelocity(time)/1000 * xSign * cos(-theta) + yResult.getVelocity(time)/1000 * xSign * sin(-theta)
+            vy = xResult.getVelocity(time)/1000 * ySign * sin(theta) + yResult.getVelocity(time)/1000 * ySign * cos(theta)
 
-            val targetW = botToWheelVels(Pose(vx, vy, angularResult.getVelocity(time)))
+            val targetW = botToWheelVels(Pose(vx, vy, (angularResult.getVelocity(time) * rotSign)))
             telemetry?.addData("targetW", targetW.toString())
 
             // velocities are in ticks/10ms :( I want rad/s!!!!!!!
