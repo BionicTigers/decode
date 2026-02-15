@@ -20,6 +20,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Kicker
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Output
+import org.firstinspires.ftc.teamcode.mechanisms.Persistents
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Pose
@@ -28,8 +29,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Autonomous
 class RedFar : LinearOpMode() {
-    private val startPose = Pose(Distance.inch(9).mm, 609.6 * 2.5, 90)
-    private val farShootPose = Pose(Distance.inch(20).mm, 609.6 * 2.5, 60+90)
+    private val startPose = Pose(Distance.inch(9).mm, 609.6 * 2.2, 90)
+    private val farShootPose = Pose(Distance.inch(20).mm, 609.6 * 2.2, 120)
     private val shootClosePose = Pose(609.6 * 3.5, 609.6 * 2.5, 90 - 45+90)
     private val queueClosePose = Pose(609.6 * 1.5, 609.6 * 2, 180)
     private val grabClosePose = Pose(609.6 * 1.5, 609.6 * 0.5, 180)
@@ -128,6 +129,7 @@ class RedFar : LinearOpMode() {
         waitForStart()
         if (isStopRequested) {
             Scheduler.clear()
+            Persistents.currentPose = odometry.position
             return
         }
 
@@ -141,6 +143,7 @@ class RedFar : LinearOpMode() {
         }
 
         Scheduler.clear()
+        Persistents.currentPose = odometry.position
     }
 
     private fun cycleFactory(

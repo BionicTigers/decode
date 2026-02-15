@@ -20,6 +20,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Kicker
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Output
+import org.firstinspires.ftc.teamcode.mechanisms.Persistents
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Pose
@@ -313,6 +314,7 @@ class BlueFar : LinearOpMode() {
         waitForStart()
         if (isStopRequested) {
             Scheduler.clear()
+            Persistents.currentPose = odometry.position
             return
         }
 
@@ -326,6 +328,7 @@ class BlueFar : LinearOpMode() {
         }
 
         Scheduler.clear()
+        Persistents.currentPose = odometry.position
     }
 
     private fun cycleFactory(

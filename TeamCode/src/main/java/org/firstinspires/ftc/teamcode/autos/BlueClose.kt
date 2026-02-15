@@ -20,6 +20,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Kicker
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Output
+import org.firstinspires.ftc.teamcode.mechanisms.Persistents
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Pose
@@ -30,7 +31,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class BlueClose : LinearOpMode() {
     private val startPose = Pose(609.6 * (5+1/5), 609.6 * 5, 45)
     private val farShootPose = Pose(Distance.inch(20).mm, 609.6 * 3.5, 60)
-    private val shootClosePose = Pose(609.6 * 3, 609.6 * 3.5, 90 - 45)
+    private val shootClosePose = Pose(609.6 * 2.5, 609.6 * 3.75, 90 - 45)
     private val queueClosePose = Pose(609.6 * 1.5, 609.6 * 4, 0)
     private val grabClosePose = Pose(609.6 * 1.5, 609.6 * 5.5, 0)
     private val queueMiddlePose = Pose(1211.37, 2125.95, 0)
@@ -136,6 +137,7 @@ class BlueClose : LinearOpMode() {
         waitForStart()
         if (isStopRequested) {
             Scheduler.clear()
+            Persistents.currentPose = odometry.position
             return
         }
 
@@ -149,6 +151,7 @@ class BlueClose : LinearOpMode() {
         }
 
         Scheduler.clear()
+        Persistents.currentPose = odometry.position
     }
 
     private fun cycleFactory(

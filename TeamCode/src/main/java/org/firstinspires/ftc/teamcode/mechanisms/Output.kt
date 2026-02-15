@@ -54,6 +54,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         val stop: Digital?
         val toggle: Digital?
         val toggleSlow: Digital?
+        val incPercent: Digital?
+        val decPercent: Digital?
         val incVel: Digital?
         val decVel: Digital?
         val smallIncVel: Digital?
@@ -81,8 +83,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     val shooterHeight = 255.2 // must be in mm
 
     // at the corners of the field
-    val redGoalPos = Pose(3657.6,0.0, 0.0)
-    val blueGoalPos = Pose(3657.6,3657.6, 0.0)
+    val redGoalPos = Pose(3657.6 - 50,0.0, 0.0)
+    val blueGoalPos = Pose(3627.6 - 50,3627.6, 0.0)
     // distance from red/blueGoalPos to the wall of the goal at their closest point, in mm
     val k = 464.5
 
@@ -99,8 +101,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     // )
 
     val velocityMap = interpolatedMapOf(
-        3600.0 to 2230.0,
-        2042.0 to 1900.0
+        3600.0 to 2100.0,
+        2042.0 to 1730.0
     )
 //    val velocityMap2 = interpolatedMapOf(
 //        3044.0 to 2060.0, // 12.1 V
@@ -123,6 +125,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var lastDist = 0.0
     var lastvel = 0.0
     var lastvoltage = 0.0
+
+    var percent = 1.0
 
     override val update = SystemCommand.continuous("Output Data") {
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
@@ -164,7 +168,7 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 //
 //                val distToGoalWall = (currentPos.position - closestPoint).magnitude()
             val distToGoalWall = (goalPos.position - currentPos.position).magnitude()
-            targetVelocity = velocityMap[distToGoalWall]
+            targetVelocity = (velocityMap[distToGoalWall]) * percent
 
             val error = targetVelocity - velocity.average
             val rampPower = if (error > 400) 1.0 else 0.0
@@ -319,6 +323,16 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         active = true
     }
 
+    fun incPercent() = SystemCommand.instant("Output Enable") {
+        percent += .05
+    }
+
+    fun decPercent() = SystemCommand.instant("Output Enable") {
+        if(percent > 0.05) {
+            percent -= .05
+        }
+    }
+
     fun incVel() = SystemCommand.instant("Output Enable") {
         targetVelocity += 100
         active = true
@@ -375,6 +389,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
             toggleSlow?.let { builder.register(it) { if (active && targetVelocity == closeTarget) stop() else shootClose() } }
             incVel?.let { builder.register(it) { incVel() } }
             decVel?.let { builder.register(it) { decVel() } }
+            incPercent?.let { builder.register(it) {incPercent()} }
+            decPercent?.let { builder.register(it) {decPercent()} }
             smallIncVel?.let { builder.register(it) { smallIncVel() } }
             smallDecVel?.let { builder.register(it) { smallDecVel() } }
             aimLeft?.let { builder.register(it) { turnLeft() } }

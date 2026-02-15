@@ -30,11 +30,13 @@ open class BaseProfile {
         override val stop = null
         override val toggle = Digital.Y.press()
         override val toggleSlow = Digital.B.press()
-        override val aimLeft: Digital = Digital.DPAD_LEFT.press()
-        override val aimRight: Digital = Digital.DPAD_RIGHT.press()
+        override val aimLeft: Digital? = null
+        override val aimRight: Digital? = null
         override val resetOdometry: Digital = Digital.DPAD_UP.press()
         override val incVel: Digital? = null
         override val decVel: Digital? = null
+        override val incPercent: Digital = Digital.DPAD_LEFT.press()
+        override val decPercent: Digital = Digital.DPAD_RIGHT.press()
         override val smallIncVel: Digital? = null
         override val smallDecVel: Digital? = null
         override val desiredGamepad = Gamepads.GAMEPAD_1 // change back to 2 before comp
