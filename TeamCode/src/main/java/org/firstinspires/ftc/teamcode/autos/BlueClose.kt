@@ -17,6 +17,7 @@ import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
 import org.firstinspires.ftc.teamcode.mechanisms.Kicker
+import org.firstinspires.ftc.teamcode.mechanisms.LimeLight
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Output
@@ -46,7 +47,8 @@ class BlueClose : LinearOpMode() {
         val intake = Intake(hardwareMap, octoQuad)
         val kicker = Kicker(hardwareMap, telemetry)
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
-        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false)
+        val limeLight = LimeLight(hardwareMap, telemetry )
+        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false, limeLight)
 
         kicker.servo.position = .35
 

@@ -133,7 +133,7 @@ class Sorter(
     // Runtime buffers
     private var junkTicks = octoQuad.encoderData.position[5]
     val colors: MutableList<BallColor> = MutableList(3) { BallColor.Purple }
-
+    var isGreenSeen: Boolean = false
     @Editable var kG = 0.072
     @Editable
     val pid: PID = PID(1.3, 3, 0.0, 0.0, -180.0, 180.0, -1.0, 1.0, 20.milliseconds)
@@ -174,6 +174,7 @@ class Sorter(
         pid.reset()
     }
 
+
     override val update = SystemCommand.continuous("Sorter Update") {
         val oldAngleVel = angleVel
         val deltaTicks = octoQuad.encoderData.position[5] - junkTicks
@@ -194,7 +195,7 @@ class Sorter(
         val green = colorSensor.green()
         val blue = colorSensor.blue()
 
-        val isGreen = green > red && green > blue - 100 && green > 200
+        var isGreen = green > red && green > blue - 100 && green > 200
         val isPurple = blue > red && blue > green && blue > 150
         val detectedColor = when {
             isGreen -> BallColor.Green
@@ -229,6 +230,10 @@ class Sorter(
         // Remove the ball that just left through the kicker output.
         if (kicker?.kickedThisCycle == true) {
             colors[slotIndexForPosition(SlotPosition.Output)] = BallColor.None
+        }
+
+        if (isGreen == true) {
+            isGreenSeen = true
         }
 
         ffg = abs(listOfNotNull(

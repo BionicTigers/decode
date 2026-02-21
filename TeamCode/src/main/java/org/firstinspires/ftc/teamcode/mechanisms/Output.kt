@@ -38,7 +38,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? = null, val telemetry: Telemetry? = null, val odometry: Odometry?, octoQuad: OctoQuad, val isRed: Boolean): System(), Controllable<BaseProfile> {
+class Output(hardwareMap: HardwareMap,  kicker: Kicker? = null, sorter: Sorter? = null, val telemetry: Telemetry? = null, val odometry: Odometry?, octoQuad: OctoQuad, val isRed: Boolean,val limeLight: LimeLight): System(), Controllable<BaseProfile> {
     override val name: String = "Output"
     override val dependencies = listOf(octoQuad)
     // encoder on octoQuad 4
@@ -67,6 +67,8 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
 
     val motor = hardwareMap.getByName<DcMotorEx>("output")
     var angle = Angle.ZERO
+    val l:Double = 0.005
+    var servoPositionTx = (0.5 + (limeLight.tx/l)).coerceIn(-1.0,1.0)
 
     var currentVel = 0.0
     var targetAngle = angle.degrees - 1
@@ -129,6 +131,10 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
     var percent = 1.0
 
     override val update = SystemCommand.continuous("Output Data") {
+
+         servoPositionTx = (0.5 + (limeLight.getAngle() * l)).coerceIn(-1.0,1.0)
+
+
 //        val lVel = hub.getEncoderTicks(0) / it.deltaTime.seconds
         val lVel = (octoQuad.encoderData.position[4] - junkTicks) / it.deltaTime.seconds
         if (lVel.isFinite()) {
@@ -231,10 +237,12 @@ class Output(hardwareMap: HardwareMap, kicker: Kicker? = null, sorter: Sorter? =
         // Convert to servo position
         // At 0.5, turret is aligned with robot's forward direction (0 relative angle)
         // 90° servo range: -45° (servo 0.0) to +45° (servo 1.0)
+
         val servoPosition = (0.5 - ((relativeAngle) / (PI / 3))).coerceIn(0.1, 0.9)
 
         telemetry?.addData("Angle", Math.toDegrees(relativeAngle))
         telemetry?.addData("Servo Position", servoPosition)
+        telemetry?.addData("servo position", servoPositionTx)
 
         if (isRed)
             turret.position = servoPosition

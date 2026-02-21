@@ -18,36 +18,27 @@ import org.firstinspires.ftc.teamcode.utils.milliseconds
 import kotlin.time.TimeSource
 import kotlin.time.measureTime
 
-@TeleOp(name = "BLUE Main Control")
-class MainControl : LinearOpMode() {
+@TeleOp(name = "TestUrServo")
+class Test: LinearOpMode() {
     override fun runOpMode() {
-        val b = TimeSource.Monotonic.markNow()
-//        val odometry = Odometry(hardwareMap, null, Pose(609.6*.5, 609.6*3 - 609.6*.5, 90.0)) //Pose(609.6 * 6 - 609.6 * (4/5), 609.6, 270))
-        val odometry = Odometry(hardwareMap, null, Persistents.currentPose)
         val octoquad = OctoQuad(hardwareMap, null)
-        val drivetrain = Drivetrain(hardwareMap, null, odometry, octoquad)
-        val intake = Intake(hardwareMap, octoquad)
-        val kicker = Kicker(hardwareMap)
-        val sorter = Sorter(hardwareMap, kicker, telemetry, octoquad)
         val limeLight = LimeLight(hardwareMap, telemetry )
-        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad, false, limeLight )
+
+        val output = Output(hardwareMap, null, null, null, null, octoquad, true, limeLight)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
-            listOf(drivetrain, intake, output, sorter, kicker)
+            listOf(output)
         )
-
         Scheduler.telemetry = telemetry
-        Scheduler.schedule(drivetrain, controls, intake, sorter, output, kicker, octoquad, odometry)
-
-
+        Scheduler.schedule( controls,output, octoquad, limeLight)
         waitForStart()
 
         while (opModeIsActive()) {
-            telemetry.addData("Time Taken", measureTime {
-                Scheduler.tick()
-            }.milliseconds)
+            Scheduler.tick
             telemetry.update()
         }
 
         Scheduler.clear()
     }
 }
+
+

@@ -7,6 +7,7 @@ import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
 import org.firstinspires.ftc.teamcode.mechanisms.Kicker
+import org.firstinspires.ftc.teamcode.mechanisms.LimeLight
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Output
 import org.firstinspires.ftc.teamcode.mechanisms.Sorter
@@ -28,7 +29,8 @@ class MainControlBlue : LinearOpMode() {
         val intake = Intake(hardwareMap, octoquad)
         val kicker = Kicker(hardwareMap)
         val sorter = Sorter(hardwareMap, kicker, telemetry, octoquad)
-        val output = Output(hardwareMap, kicker, sorter, null, odometry, octoquad, true)
+        val limeLight = LimeLight(hardwareMap , telemetry)
+        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoquad, true, limeLight)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default,
             listOf(drivetrain, intake, output, sorter, kicker)
         )
@@ -43,6 +45,8 @@ class MainControlBlue : LinearOpMode() {
             telemetry.addData("Time Taken", measureTime {
                 Scheduler.tick()
             }.milliseconds)
+            telemetry.addData("ur", limeLight.getAngleFin())
+            telemetry.addData("ul",limeLight.getAngle())
             telemetry.update()
         }
 
