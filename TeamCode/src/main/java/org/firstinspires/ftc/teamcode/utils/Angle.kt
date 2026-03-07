@@ -62,3 +62,6 @@ class Angle private constructor(val radians: Double) : Comparable<Angle> {
     val cos = cos(radians)
     val tan = tan(radians)
 }
+
+val Number.degrees get() = Angle.degrees(this)
+val Number.radians get() = Angle.radians(this)

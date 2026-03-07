@@ -18,6 +18,8 @@ class OctoQuad(hardwareMap: HardwareMap, val telemetry: Telemetry?): System() {
 
     init {
         octoQuad.resetEverything()
+        octoQuad.channelBankConfig = OctoQuadFWv3.ChannelBankConfig.BANK1_QUADRATURE_BANK2_PULSE_WIDTH
+        octoQuad.setSingleChannelPulseWidthParams(4, 1, 1024) // transfer
     }
 
     override val update = SystemCommand.continuous("OctoQuad Encoder Read") {

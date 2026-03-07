@@ -108,8 +108,8 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             )
         )
 
-        val testBotDirections = listOf(DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE)
-        val autoDirections = listOf(DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE)
+        val testBotDirections = listOf(DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.REVERSE)
+        val autoDirections = listOf(DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.FORWARD, DcMotorSimple.Direction.REVERSE, DcMotorSimple.Direction.REVERSE)
     }
 
     /* We only need to set these if we are using driver control */

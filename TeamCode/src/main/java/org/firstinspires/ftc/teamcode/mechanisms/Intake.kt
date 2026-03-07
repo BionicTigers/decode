@@ -20,50 +20,36 @@ import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.abs
 import kotlin.math.min
 
-class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Controllable<BaseProfile> {
-    //ch 1
+class Intake(hardwareMap: HardwareMap): System(), Controllable<BaseProfile> {
     override val name: String = "Intake"
 
     interface Schema : ControlSchema {
         val intake: Digital?
         val stop: Digital?
         val toggle: Digital?
+        val reverse: Digital?
     }
 
     val motor = hardwareMap.getByName<DcMotorEx>("intake")
+    var active = false
 
-    var active: Boolean = false
-    var velocity = RollingAverage(3)
-    @Editable
-    var targetVelocity = 30000.0
-    private val velocitySampleIntervalMs = 20
-
-    @Editable
-    var pid = PID(1.0, 0.0, 0.0, 0.0, 0.0, 30000.0, -1.0, 1.0)
-    @Editable
-    var ff = .00075
-
-    init {
-        motor.direction = DcMotorSimple.Direction.REVERSE
-        octoQuad.octoQuad.setSingleEncoderDirection(6, OctoQuadFWv3.EncoderDirection.FORWARD)
-        octoQuad.octoQuad.setSingleVelocitySampleInterval(6, velocitySampleIntervalMs)
-    }
-
-    override val apply = SystemCommand.continuous("Intake After Run") {
-        val ticksPerSec = octoQuad.encoderData.velocity[6] * 1000 / velocitySampleIntervalMs
-        velocity.plusAssign(ticksPerSec)
-        if (active) {
-            motor.ePower = (pid.compute(abs(velocity.average), targetVelocity) + ff * targetVelocity).coerceIn(-1.0, 1.0)
-        }
-    }
+//    init {
+//        motor.direction = DcMotorSimple.Direction.REVERSE
+//    }
 
     fun intake() = SystemCommand.instant("Intake Enable") {
         active = true
+        motor.ePower = 1.0
     }
 
     fun stop() = SystemCommand.instant("Intake Disable") {
-        motor.power = 0.0
         active = false
+        motor.ePower = 0.0
+    }
+
+    fun reverse() = SystemCommand.instant("Intake Reverse") {
+        active = true
+        motor.ePower = -1.0
     }
 
     override fun bindControls(profile: BaseProfile, gamepad: Gamepads, builder: Controls.Builder) {
@@ -73,6 +59,7 @@ class Intake(hardwareMap: HardwareMap, val octoQuad: OctoQuad): System(), Contro
             intake?.let { builder.register(it) { intake() } }
             stop?.let { builder.register(it) { stop() } }
             toggle?.let { builder.register(it) { if (active) stop() else intake() } }
+            reverse?.let { builder.register(it) { reverse() } }
         }
     }
 }

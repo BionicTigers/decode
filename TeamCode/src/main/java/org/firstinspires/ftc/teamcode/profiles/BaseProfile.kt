@@ -5,9 +5,8 @@ import io.github.bionictigers.axiom.core.input.types.Analog
 import io.github.bionictigers.axiom.core.input.types.Digital
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
-import org.firstinspires.ftc.teamcode.mechanisms.Kicker
-import org.firstinspires.ftc.teamcode.mechanisms.Output
-import org.firstinspires.ftc.teamcode.mechanisms.Sorter
+import org.firstinspires.ftc.teamcode.mechanisms.Shooter
+import org.firstinspires.ftc.teamcode.mechanisms.Transfer
 
 open class BaseProfile {
     val drivetrain = object : Drivetrain.Schema {
@@ -22,42 +21,23 @@ open class BaseProfile {
         override val intake = null
         override val stop = null
         override val toggle = Digital.A.press()
+        override val reverse = Digital.B.press()
         override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
-    open val output = object : Output.Schema {
-        override val shoot = null
-        override val stop = null
-        override val toggle = Digital.Y.press()
-        override val toggleSlow = Digital.B.press()
-        override val aimLeft: Digital? = null
-        override val aimRight: Digital? = null
-        override val resetOdometry: Digital = Digital.DPAD_UP.press()
-        override val incVel: Digital? = null
-        override val decVel: Digital? = null
-        override val incPercent: Digital = Digital.DPAD_LEFT.press()
-        override val decPercent: Digital = Digital.DPAD_RIGHT.press()
-        override val smallIncVel: Digital? = null
-        override val smallDecVel: Digital? = null
-        override val desiredGamepad = Gamepads.GAMEPAD_1 // change back to 2 before comp
+    val sorter = object : Transfer.Schema {
+        override val sort = Digital.LEFT_BUMPER
+        override val shoot = Digital.RIGHT_BUMPER
+        override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
-    open val sorter = object : Sorter.Schema {
-        override val forward = Digital.RIGHT_BUMPER.press()
-        override val backward = Digital.LEFT_BUMPER.press()
-        override val green = Digital.DPAD_LEFT.press()
-        override val purple = Digital.DPAD_RIGHT.press()
-        override val openIntake = null
-        override val openHuman = null
-        override val outputToggle = Digital.A.press()
-        override val desiredGamepad = Gamepads.GAMEPAD_2
-    }
-
-    open val kicker = object : Kicker.Schema {
-        override val kick : Digital = Digital.X.press()
-        override val up : Digital = Digital.DPAD_UP.press()
-        override val down: Digital = Digital.DPAD_DOWN.press()
-        override val desiredGamepad = Gamepads.GAMEPAD_2
+    val shooter = object : Shooter.Schema {
+        override val togglePower = Digital.X.press()
+        override val aimLeft = Digital.DPAD_LEFT
+        override val aimRight = Digital.DPAD_RIGHT
+        override val hoodUp = Digital.DPAD_UP
+        override val hoodDown = Digital.DPAD_DOWN
+        override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
     companion object {
