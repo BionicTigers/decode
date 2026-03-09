@@ -6,7 +6,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.tan
 
-class Angle private constructor(val radians: Double) : Comparable<Angle> {
+class Angle private constructor(var radians: Double) : Comparable<Angle> {
     companion object {
         fun radians(radians: Number) = Angle(radians.toDouble())
         fun degrees(degrees: Number) = Angle(degrees.toDouble() / 180 * PI)
