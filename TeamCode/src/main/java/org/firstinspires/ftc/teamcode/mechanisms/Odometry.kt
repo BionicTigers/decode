@@ -36,8 +36,8 @@ object Configs {
     }
 
     object Main: RobotConfig {
-        override val forwardOffset: Distance = Distance.inch(5.656)
-        override val strafeOffset: Distance = Distance.inch(0.0)
+        override val forwardOffset: Distance = Distance.inch(6.3125)
+        override val strafeOffset: Distance = Distance.inch(-2.5)
     }
 }
 
@@ -66,7 +66,7 @@ class Odometry(
     init {
         pinpoint.setOffsets(config.forwardOffset.mm, config.strafeOffset.mm, DistanceUnit.MM)
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
-        pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED)
+        pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD)
         pinpoint.recalibrateIMU()
         pinpoint.setPosition(Pose2D(DistanceUnit.MM,startPose.y, -startPose.x, AngleUnit.DEGREES, -startPose.degrees))
     }

@@ -18,15 +18,15 @@ import kotlin.time.measureTime
 @TeleOp()
 class FullRobotTest : LinearOpMode() {
     override fun runOpMode() {
-        val octoQuad = OctoQuad(hardwareMap, telemetry)
-        val transfer = Transfer(hardwareMap, octoQuad, telemetry)
+        val octoQuad = OctoQuad(hardwareMap, null)
+        val transfer = Transfer(hardwareMap, octoQuad, null)
         val intake = Intake(hardwareMap)
         val odometry = Odometry(hardwareMap, telemetry)
         val drivetrain = Drivetrain(hardwareMap, null, odometry, octoQuad)
         val shooter = Shooter(hardwareMap, odometry, null, telemetry, true)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default, listOf(transfer, intake, drivetrain, shooter))
 
-        Scheduler.schedule(octoQuad, transfer, controls, drivetrain, intake, shooter)
+        Scheduler.schedule(octoQuad, transfer, controls, drivetrain, intake, shooter, odometry)
 
         waitForStart()
 

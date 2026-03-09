@@ -26,13 +26,15 @@ open class BaseProfile {
     }
 
     val sorter = object : Transfer.Schema {
-        override val sort = Digital.LEFT_BUMPER
-        override val shoot = Digital.RIGHT_BUMPER
+        override val sort = null//Digital.LEFT_BUMPER
+        override val shoot = null//Digital.RIGHT_BUMPER
         override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
     val shooter = object : Shooter.Schema {
         override val togglePower = Digital.X.press()
+        override val flywlInc = Digital.RIGHT_BUMPER.press()
+        override val flywlDec = Digital.LEFT_BUMPER.press()
         override val aimLeft = Digital.DPAD_LEFT
         override val aimRight = Digital.DPAD_RIGHT
         override val hoodUp = Digital.DPAD_UP
