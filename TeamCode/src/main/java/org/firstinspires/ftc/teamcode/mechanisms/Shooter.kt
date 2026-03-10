@@ -16,6 +16,7 @@ import org.firstinspires.ftc.teamcode.profiles.BaseProfile
 import org.firstinspires.ftc.teamcode.utils.Angle
 import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.RollingAverage
+import org.firstinspires.ftc.teamcode.utils.degrees
 import org.firstinspires.ftc.teamcode.utils.ePower
 import org.firstinspires.ftc.teamcode.utils.getByName
 import org.firstinspires.ftc.teamcode.utils.interpolatedMapOf
@@ -48,7 +49,9 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
 
     val flywheel = hardware.getByName<DcMotorEx>("shooter")
     val turret = hardware.getByName<DcMotorEx>("shooterAim")
-    val hoodServo = hardware.getByName<Servo>("hood")
+    val hood = hardware.getByName<Servo>("hood")
+    val wheelLight = hardware.getByName<Servo>("wheelLight")
+    val aimLight = hardware.getByName<Servo>("aimLight")
 
     val turretPID = PID(5.0, 0.0, 0.0, 0.0, -180.0, 180.0, -.3, .3)
     val flywheelPID: PID = PID(2.0, 2.0, 0.0, 1.0, 0.0, 2700.0, 0.0, 1.0)
@@ -73,6 +76,8 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     var isActive = false
 
     var junkTicks = 0
+    var ticks = 0
+    var currentAngle = 0.0
 
     var aimedAt: TimeMark? = null
 
@@ -82,8 +87,10 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
 
     override val apply = SystemCommand.continuous {
         //turret
+        var deltaTicks = turret.currentPosition - ticks
+        var deltaAngle = (deltaTicks / ticksPerRev) * 360.0
+        currentAngle += deltaAngle
 
-        val currentAngle = (((turret.currentPosition - junkTicks) / ticksPerRev) * 360.0).normalizeDegrees180()
         //Static target position in mm
         val targetX = if (isRed) redGoalPos.x else blueGoalPos.x
         val targetY = if (isRed) redGoalPos.y else blueGoalPos.y
@@ -107,13 +114,17 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         while (targetAngle.radians < -PI) targetAngle.radians += 2 * PI
         targetAngle = Angle.degrees(targetAngle.degrees.coerceIn(-170.0, 170.0))
 
-        val tolerance = 0.0
-        if ((currentAngle - tolerance) < targetAngle.degrees && targetAngle.degrees < (currentAngle + tolerance)) {
-//            targetAngle = Angle.degrees(limeLight!!.getAngle())
+        val error = targetAngle.degrees - currentAngle
+        val lmlError = Angle.degrees(limeLight!!.getAngle())
+
+        if (abs(error - lmlError.degrees) > 2.0) {
+            currentAngle = targetAngle.degrees - lmlError.degrees
         }
 
-        val error = (targetAngle.degrees - currentAngle).normalizeDegrees180()
-        val correctedTarget = currentAngle + error
+        val tolerance = 0.0
+        if (lmlError < tolerance.degrees) {
+            aimLight.position = .5 // probably add the hood to the condition if we end up using the encoder
+        }
 
         telemetry?.addData(" -- shooter futurePose --", futurePos)
         telemetry?.addLine("--- aim ---")
@@ -159,7 +170,9 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         telemetry?.addData("-distToGoalWall",distToGoalWall)
         telemetry?.addData("-hoodAngle", hoodDistToAngle[distToGoalWall] + hoodMod)
 
-        hoodServo.position = hoodAngle
+        hood.position = hoodAngle
+
+        ticks = turret.currentPosition
     }
 
     fun togglePower() = SystemCommand.instant("Toggle Shooter Power") {
@@ -177,11 +190,11 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     }
 
     fun hoodUp() = SystemCommand.instant("Hood Up") {
-        hoodServo.position += .1
+        hood.position += .1
     }
 
     fun hoodDown() = SystemCommand.instant("Hood Down") {
-        hoodServo.position -= .1
+        hood.position -= .1
     }
 
     fun flywheelManualInc() = SystemCommand.instant("Flywheel Manual Inc") {

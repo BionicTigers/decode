@@ -12,25 +12,21 @@ import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.atan2
 
 
-class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry): System() {
-
-
+class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry, isRed: Boolean): System() {
     override val name = "Vision"
     enum class Obelisk {
         PPG,
         PGP,
         GPP,
-        RED,
-        BLUE,
         NO_DETECTION
     }
 
-    var ty: Double = 0.0
+    val ticksToAngle = 0.03937
 
-    var green: Double = 0.0
+    val offsetBlue = 0.0
+    val offsetRed = 0.0
+
     val limeLight = hardwareMap.getByName<Limelight3A>("limeLight")
-    val result = limeLight.latestResult
-    var tx = result.getTx()
     var obeliskCode = Obelisk.NO_DETECTION
         private set
 
@@ -39,7 +35,7 @@ class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry): System() {
         limeLight.start()
     }
 
-    fun getAngleFin(): String {
+    fun getAngleFin(): Obelisk {
         limeLight.pipelineSwitch(0)
         val result = limeLight.latestResult
         val fiducials = result.fiducialResults
@@ -53,41 +49,27 @@ class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry): System() {
         }
         telemetry?.addData("ID", fiducials.map { it.fiducialId }.toString())
 
-
-        tx = result.getTx()
-        ty = result.getTy()
-//        if (ty == 0.0) {
-//            telemetry?.addData("You did it", ty * 0.03937)
-//        }
-//        if (ty != 0.0) {
-//                    telemetry?.addData("Keep going", ty * 0.03937)
-//        }
-        return fiducials.map { it.fiducialId }.toString()
+        return obeliskCode
     }
 
     fun getAngle(): Double {
         limeLight.pipelineSwitch(0)
         val result = limeLight.latestResult
         val fiducials = result.fiducialResults
+        var angleToTurn = 0.0
+
         fiducials?.forEach {
-            obeliskCode = when (it?.fiducialId) {
-                20 -> Obelisk.BLUE
-                24 -> Obelisk.RED
-                else -> Obelisk.NO_DETECTION
+            if (it?.fiducialId == 20) { // blue
+                val tx = result.tx
+                angleToTurn = tx - offsetBlue
+            } else if (it?.fiducialId == 24) { // red
+                val tx = result.tx
+                angleToTurn = tx - offsetRed
             }
         }
+
         telemetry?.addData("ID", fiducials.map { it.fiducialId }.toString())
 
-        tx = result.getTx()
-        ty = result.getTy()
-//        if (ty == 0.0) {
-//            telemetry?.addData("You did it", ty * 0.03937)
-//        }
-//        if (ty != 0.0) {
-//            telemetry?.addData("Keep going", ty * 0.03937)
-//        }
-        val offset = 0.0
-        val angleToTurn = (tx - offset) * 0.03937
         return angleToTurn
     }
 

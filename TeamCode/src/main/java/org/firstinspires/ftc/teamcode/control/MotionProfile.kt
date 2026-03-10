@@ -393,10 +393,15 @@ fun generateMotionProfile(
     }
 
     if (inverse) {
-        acceleration.reverse()
-        velocity.reverse()
         position.reverse()
     }
+
+    val dir = (f - s).sign
+    for (i in 0..<position.size) {
+        velocity[i] *= dir
+        acceleration[i] *= dir
+    } // chat gpt says this is worse than another method and could mess up starting vels if we do them
+    // and to do something else but i didnt feel like understanding it so i didnt do it lmao
 
     return MotionResult(acceleration, velocity, position, timeList, timeslice, final)
 }
