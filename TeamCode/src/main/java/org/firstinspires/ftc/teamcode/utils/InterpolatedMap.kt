@@ -2,18 +2,19 @@ package org.firstinspires.ftc.teamcode.utils
 
 class InterpolatedMap : HashMap<Double, Double>() {
     override fun get(key: Double): Double {
-        val keys = keys.toList()
-        val values = values.toList()
-        if (keys.isEmpty()) return 0.0
-        if (keys.size == 1) return values[0]
-        if (key <= keys[0]) return values[0]
-        if (key >= keys[keys.size - 1]) return values[keys.size - 1]
-        for (i in 0 until keys.size - 1) {
-            if (key >= keys[i] && key <= keys[i + 1]) {
-                val x1 = keys[i]
-                val x2 = keys[i + 1]
-                val y1 = values[i]
-                val y2 = values[i + 1]
+        val points = entries.sortedBy { it.key }
+        if (points.isEmpty()) return 0.0
+        if (points.size == 1) return points[0].value
+        if (key <= points[0].key) return points[0].value
+        if (key >= points[points.size - 1].key) return points[points.size - 1].value
+        for (i in 0 until points.size - 1) {
+            val left = points[i]
+            val right = points[i + 1]
+            if (key >= left.key && key <= right.key) {
+                val x1 = left.key
+                val x2 = right.key
+                val y1 = left.value
+                val y2 = right.value
                 return y1 + (key - x1) * (y2 - y1) / (x2 - x1)
             }
         }
