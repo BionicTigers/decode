@@ -12,6 +12,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer
 import org.firstinspires.ftc.teamcode.profiles.BaseProfile
+import org.firstinspires.ftc.teamcode.utils.Pose
 import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.time.measureTime
 
@@ -21,7 +22,9 @@ class FullRobotTest : LinearOpMode() {
         val octoQuad = OctoQuad(hardwareMap, null)
         val transfer = Transfer(hardwareMap, octoQuad, null)
         val intake = Intake(hardwareMap)
-        val odometry = Odometry(hardwareMap, telemetry)
+        val odometry = Odometry(hardwareMap, telemetry,
+            Pose(609.6 * .3, 609.6 * 3 - 609.6 * .5, 90.0)
+        )
         val drivetrain = Drivetrain(hardwareMap, null, odometry, octoQuad)
         val shooter = Shooter(hardwareMap, odometry, null, telemetry, true)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default, listOf(transfer, intake, drivetrain, shooter))
