@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.utils
 import io.github.bionictigers.axiom.core.web.Display
 import java.util.LinkedList
 import java.util.Queue
+import kotlin.math.abs
 
 /**
  * Calculate a rolling average from a stream of numbers. Only the last 'size' elements will be
@@ -73,5 +74,9 @@ class RollingAverage(var size: Int) {
      */
     fun reset() {
         queue.clear()
+    }
+
+    fun getConsistency(): Double {
+        return abs(queue.max() - queue.min())
     }
 }

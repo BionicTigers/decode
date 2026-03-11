@@ -23,14 +23,14 @@ class FullRobotTest : LinearOpMode() {
         val transfer = Transfer(hardwareMap, octoQuad, null)
         val intake = Intake(hardwareMap)
         val limelight = Limelight(hardwareMap, telemetry, true)
-        val odometry = Odometry(hardwareMap, telemetry,
+        val odometry = Odometry(hardwareMap, null,
             Pose(Distance.inch(14/2).mm, 609.6 * 3 - 609.6 * .5, 90.0)
         )
         val drivetrain = Drivetrain(hardwareMap, null, odometry, octoQuad)
         val shooter = Shooter(hardwareMap, odometry, limelight, telemetry, true)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default, listOf(transfer, intake, drivetrain, shooter))
 
-        Scheduler.schedule(octoQuad, transfer, controls, drivetrain, intake, shooter, odometry)
+        Scheduler.schedule(octoQuad, transfer, controls, drivetrain, intake, shooter, odometry, limelight)
 
         waitForStart()
 

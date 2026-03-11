@@ -50,7 +50,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     val turret = hardware.getByName<DcMotorEx>("shooterAim")
     val hood = hardware.getByName<Servo>("hood")
 //    val wheelLight = hardware.getByName<Servo>("wheelLight")
-//    val aimLight = hardware.getByName<Servo>("aimLight")
+    val aimLight = hardware.getByName<Servo>("aimLight")
 
     private val aimLowerBound = -73.0
     private val aimUpperBound = 105.0
@@ -111,7 +111,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         }
 
     override val apply = SystemCommand.continuous {
-        telemetry?.addData("ticks", ticks)
+//        telemetry?.addData("ticks", ticks)
 
         val futurePos = getFuturePose() ?: return@continuous
 
@@ -142,16 +142,19 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         targetAngle = Angle.degrees(targetAngle.degrees.coerceIn(aimLowerBound, aimUpperBound))
 
         val error = targetAngle.degrees - currentAngle
-//        val lmlError = Angle.degrees(limeLight!!.getAngle())
+        val lmlError = Angle.degrees(limeLight!!.lmlAimError)
 
-//        if (abs(error - lmlError.degrees) > 2.0 && turret.velocity < 10) {
-//            currentAngle = targetAngle.degrees - lmlError.degrees
-//        }
+        telemetry?.addData("lmlerror", lmlError)
+
+        if (abs(error - lmlError.degrees) > 0.5 && turret.velocity < 10) {
+            currentAngle -= lmlError.degrees
+        }
 
         val tolerance = 0.0
-//        if (lmlError < tolerance.degrees) {
-////            aimLight.position = .5 // probably add the hood to the condition if we end up using the encoder
-//        }
+        if (lmlError.degrees < tolerance) {
+            aimLight.position = .7 // probably add the hood to the condition if we end up using the encoder
+        } else
+            aimLight.position = .4
 
         telemetry?.addData(" -- shooter futurePose --", futurePos)
         telemetry?.addLine("--- aim ---")
@@ -173,7 +176,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         telemetry?.addData("ticks", turret.currentPosition)
 
         //flywheel
-        telemetry?.addLine("--- flywheel ---")
+//        telemetry?.addLine("--- flywheel ---")
 
         flywheelVel += flywheel.velocity
 
@@ -181,18 +184,18 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         val desiredVelocity = targetVelocity
        flywheel.ePower =  if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0
         // flywheel.ePower = if (isActive) 1.0 else 0.0
-        telemetry?.addData("flywheelVel", flywheelVel.average)
-        telemetry?.addData("-flywlMod",flywlMod)
-        telemetry?.addData("-targetVelocity", desiredVelocity)
-        telemetry?.addData("flywheel power", if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0)
+//        telemetry?.addData("flywheelVel", flywheelVel.average)
+//        telemetry?.addData("-flywlMod",flywlMod)
+//        telemetry?.addData("-targetVelocity", desiredVelocity)
+//        telemetry?.addData("flywheel power", if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0)
 
         // hood
-        telemetry?.addLine("--- hood ---")
-
+//        telemetry?.addLine("--- hood ---")
+//
         val hoodAngle = (hoodDistToAngle[distToGoalWall] + hoodMod)
-        telemetry?.addData("-hoodMod",hoodMod)
-        telemetry?.addData("-distToGoalWall",distToGoalWall)
-        telemetry?.addData("-hoodAngle", hoodDistToAngle[distToGoalWall] + hoodMod)
+//        telemetry?.addData("-hoodMod",hoodMod)
+//        telemetry?.addData("-distToGoalWall",distToGoalWall)
+//        telemetry?.addData("-hoodAngle", hoodDistToAngle[distToGoalWall] + hoodMod)
 
         hood.position = hoodAngle
 
@@ -238,11 +241,11 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     }
 
     fun aimManualRight() = SystemCommand.instant("Flywheel Manual Inc") {
-        aimMod += 5
+        currentAngle -= 5
     }
 
     fun aimManualLeft() = SystemCommand.instant("Flywheel Manual Dec") {
-        aimMod -= 5
+        currentAngle += 5
     }
 
     fun hoodManualInc() = SystemCommand.instant("Flywheel Manual Inc") {
