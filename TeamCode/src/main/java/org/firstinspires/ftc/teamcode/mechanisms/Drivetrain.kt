@@ -96,15 +96,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
         val angularProfile = MotionProfile(angularJerk.radians, angularMaxAcceleration.radians, angularMaxVelocity.radians)
 
         val wheelRadius = 0.096
-        val lx = 0.371475
-        val ly = 0.352425
+        val lx = 0.18
+        val ly = 0.14
 
         val K: Matrix = Matrix(
             arrayOf(
-                arrayOf(0.085305766656032, 0.085305766656036, 0.016022179744041, 0.142498099853715, -0.000614655076519, 0.000614655076519, 0.001755158084200),
-                arrayOf(-0.085305766656032, 0.085305766656037, -0.016022179744041, -0.000614655076519, 0.142498099853715, 0.001755158084200, 0.000614655076519),
-                arrayOf(-0.085305766656032, 0.085305766656036, 0.016022179744041, 0.000614655076519, 0.001755158084200, 0.142498099853715, -0.000614655076519),
-                arrayOf(0.085305766656032, 0.085305766656037, -0.016022179744041, 0.001755158084200, 0.000614655076519, -0.000614655076519, 0.142498099853715),
+                arrayOf(0.074529706980031, 0.036378956770099, 0.008214118860763, 0.014437066736968, -0.006441274437100, 0.001530685674523, 0.004455479086498),
+                arrayOf(-0.074529706980031, 0.036378956770099, -0.008214118860763, -0.006441274437100, 0.014437066736968, 0.004455479086498, 0.001530685674523),
+                arrayOf(-0.074529706980031, 0.036378956770099, 0.008214118860764, 0.001530685674523, 0.004455479086498, 0.014437066736968, -0.006441274437100),
+                arrayOf(0.074529706980031, 0.036378956770099, -0.008214118860763, 0.004455479086498, 0.001530685674523, -0.006441274437100, 0.014437066736968),
             )
         )
 
@@ -167,6 +167,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
 //    private var targetHeading = 0.0
 //    private var timeLetGo = TimeSource.Monotonic.markNow()
     private var rotation = 0.0
+
+    var targetx = 0.0
+    var targety = 0.0
+    var targetrot = 0.0
 
     init {
         motors.forEach {
@@ -254,7 +258,7 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
                             println("position correct")
                             telemetry?.addLine("position correct")
                             mtp = null
-                        } else if (odometry.velocity.within(Pose(), Pose(5, 5, 5))) {
+                        } else if (odometry.velocity.within(Pose(), Pose(60, 60, 30))) {
                             stuck = true
                         } else {
                             stuck = false
@@ -278,16 +282,15 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             if (mtp != null) {
                 with(mtp!!) {
 //                    println("pid calculated, ${it.deltaTime} loop time")
-                    powers.set(controlState)
 
                     if (stuck) {
                         powers.set(
-                            powers[0] + (0.2.withSignZero(powers[0])),
-                            powers[1] + (0.2.withSignZero(powers[1])),
-                            powers[2] + (0.2.withSignZero(powers[2])),
-                            powers[3] + (0.2.withSignZero(powers[3]))
+                            controlState[0, 0] + (0.3.withSignZero(powers[0])),
+                            controlState[1, 0] + (0.3.withSignZero(powers[1])),
+                            controlState[2, 0] + (0.3.withSignZero(powers[2])),
+                            controlState[3, 0] + (0.3.withSignZero(powers[3]))
                         )
-                    }
+                    } else { powers.set(controlState) }
                     // TODO: add heading pid modifier
 
                     telemetry?.addData("Error", errorState.printSimple())
@@ -442,6 +445,10 @@ class Drivetrain(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val
             val wfr = (velocities.frontRight*conv) - targetW.frontRight
             val wbl = (velocities.backLeft*conv) - targetW.backLeft
             val wbr = (velocities.backRight*conv) - targetW.backRight
+
+            targetx = x
+            targety = y
+            targetrot = rot
 
             return Matrix(
                 arrayOf(

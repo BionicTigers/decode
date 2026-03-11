@@ -50,8 +50,8 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     val flywheel = hardware.getByName<DcMotorEx>("shooter")
     val turret = hardware.getByName<DcMotorEx>("shooterAim")
     val hood = hardware.getByName<Servo>("hood")
-    val wheelLight = hardware.getByName<Servo>("wheelLight")
-    val aimLight = hardware.getByName<Servo>("aimLight")
+//    val wheelLight = hardware.getByName<Servo>("wheelLight")
+//    val aimLight = hardware.getByName<Servo>("aimLight")
 
     val turretPID = PID(5.0, 0.0, 0.0, 0.0, -180.0, 180.0, -.3, .3)
     val flywheelPID: PID = PID(2.0, 2.0, 0.0, 1.0, 0.0, 2700.0, 0.0, 1.0)
@@ -115,16 +115,16 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         targetAngle = Angle.degrees(targetAngle.degrees.coerceIn(-170.0, 170.0))
 
         val error = targetAngle.degrees - currentAngle
-        val lmlError = Angle.degrees(limeLight!!.getAngle())
+//        val lmlError = Angle.degrees(limeLight!!.getAngle())
 
-        if (abs(error - lmlError.degrees) > 2.0) {
-            currentAngle = targetAngle.degrees - lmlError.degrees
-        }
+//        if (abs(error - lmlError.degrees) > 2.0 && turret.velocity < 10) {
+//            currentAngle = targetAngle.degrees - lmlError.degrees
+//        }
 
         val tolerance = 0.0
-        if (lmlError < tolerance.degrees) {
-            aimLight.position = .5 // probably add the hood to the condition if we end up using the encoder
-        }
+//        if (lmlError < tolerance.degrees) {
+////            aimLight.position = .5 // probably add the hood to the condition if we end up using the encoder
+//        }
 
         telemetry?.addData(" -- shooter futurePose --", futurePos)
         telemetry?.addLine("--- aim ---")

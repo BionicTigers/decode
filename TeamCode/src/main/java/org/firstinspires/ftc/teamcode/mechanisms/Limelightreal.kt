@@ -12,7 +12,7 @@ import org.firstinspires.ftc.teamcode.utils.getByName
 import kotlin.math.atan2
 
 
-class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry, isRed: Boolean): System() {
+class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry, val isRed: Boolean): System() {
     override val name = "Vision"
     enum class Obelisk {
         PPG,
@@ -60,11 +60,15 @@ class LimeLight(hardwareMap: HardwareMap, telemetry: Telemetry, isRed: Boolean):
 
         fiducials?.forEach {
             if (it?.fiducialId == 20) { // blue
-                val tx = result.tx
-                angleToTurn = tx - offsetBlue
+                if (!isRed) {
+                    val tx = result.tx
+                    angleToTurn = tx - offsetBlue
+                }
             } else if (it?.fiducialId == 24) { // red
-                val tx = result.tx
-                angleToTurn = tx - offsetRed
+                if (isRed) {
+                    val tx = result.tx
+                    angleToTurn = tx - offsetRed
+                }
             }
         }
 

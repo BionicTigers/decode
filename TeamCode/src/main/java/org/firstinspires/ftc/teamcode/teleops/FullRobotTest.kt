@@ -7,6 +7,7 @@ import io.github.bionictigers.axiom.core.input.Controls
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
+import org.firstinspires.ftc.teamcode.mechanisms.LimeLight
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter
@@ -23,11 +24,12 @@ class FullRobotTest : LinearOpMode() {
         val octoQuad = OctoQuad(hardwareMap, null)
         val transfer = Transfer(hardwareMap, octoQuad, null)
         val intake = Intake(hardwareMap)
+        val limelight = LimeLight(hardwareMap, telemetry, true)
         val odometry = Odometry(hardwareMap, telemetry,
-            Pose(Distance.inch(14/2).mm, 609.6 * 3 - 609.6 * .5, 90.0)
+//            Pose(Distance.inch(14/2).mm, 609.6 * 3 - 609.6 * .5, 90.0)
         )
         val drivetrain = Drivetrain(hardwareMap, null, odometry, octoQuad)
-        val shooter = Shooter(hardwareMap, odometry, null, telemetry, true)
+        val shooter = Shooter(hardwareMap, odometry, limelight, telemetry, true)
         val controls = Controls(gamepad1, gamepad2, BaseProfile.default, BaseProfile.default, listOf(transfer, intake, drivetrain, shooter))
 
         Scheduler.schedule(octoQuad, transfer, controls, drivetrain, intake, shooter, odometry)

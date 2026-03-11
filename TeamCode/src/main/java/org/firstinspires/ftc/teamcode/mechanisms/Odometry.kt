@@ -30,14 +30,9 @@ interface RobotConfig {
 }
 
 object Configs {
-    object Test: RobotConfig {
-        override val forwardOffset: Distance = Distance.inch((6.9))
-        override val strafeOffset: Distance = Distance.inch((-3.75))
-    }
-
     object Main: RobotConfig {
-        override val forwardOffset: Distance = Distance.inch(6.3125)
-        override val strafeOffset: Distance = Distance.inch(-2.5)
+        override val forwardOffset: Distance = Distance.inch(-6.25)
+        override val strafeOffset: Distance = Distance.inch(-1.875)
     }
 }
 
