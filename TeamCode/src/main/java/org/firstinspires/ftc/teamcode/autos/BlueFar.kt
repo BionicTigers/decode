@@ -6,23 +6,18 @@ import io.github.bionictigers.axiom.core.commands.bt.BtCommand
 import io.github.bionictigers.axiom.core.commands.bt.behaviorTree
 import io.github.bionictigers.axiom.core.commands.bt.composites.Parallel
 import io.github.bionictigers.axiom.core.commands.bt.composites.ParallelPolicy
-import io.github.bionictigers.axiom.core.commands.bt.composites.Selector
 import io.github.bionictigers.axiom.core.commands.bt.composites.Sequence
-import io.github.bionictigers.axiom.core.commands.bt.decorators.Repeater
 import io.github.bionictigers.axiom.core.commands.bt.leaves.BtAction
-import io.github.bionictigers.axiom.core.commands.bt.leaves.Condition
 import io.github.bionictigers.axiom.core.commands.bt.leaves.Wait
 import io.github.bionictigers.axiom.core.commands.bt.traced
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 import org.firstinspires.ftc.teamcode.mechanisms.Intake
-import org.firstinspires.ftc.teamcode.mechanisms.LimeLight
+import org.firstinspires.ftc.teamcode.mechanisms.Limelight
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
-import org.firstinspires.ftc.teamcode.mechanisms.Output
 import org.firstinspires.ftc.teamcode.mechanisms.Persistents
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter
-import org.firstinspires.ftc.teamcode.mechanisms.Sorter
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer
 import org.firstinspires.ftc.teamcode.utils.Distance
 import org.firstinspires.ftc.teamcode.utils.Pose
@@ -193,16 +188,9 @@ import kotlin.time.Duration.Companion.milliseconds
 /*
    Shoot Routine:
        Move to start / close Pose
-       Set Transfer to Output Position
-       Spin up Shooter
-       Wait for velocity to reach far / close threshold
-       Repeat x3: Ignore the rotate if on final loop
-       Check has Ball:
-           True:
-               Kick Ball
-               Rotate transfer to next ball
-           False:
-               Rotate transfer to next ball
+      Spin up Shooter
+      Wait for velocity to reach shooting threshold
+      Feed the transfer into the shooter
 
    Pickup Routine:
        Move to queue pose
@@ -231,27 +219,21 @@ class BlueFar : LinearOpMode() {
         val odometry = Odometry(hardwareMap, telemetry, startPose)
         val drivetrain = Drivetrain(hardwareMap, telemetry, odometry, octoQuad)
         val intake = Intake(hardwareMap)
-        val limeLight = LimeLight(hardwareMap, telemetry, false)
+        val limeLight = Limelight(hardwareMap, telemetry, false)
+        val transfer = Transfer(hardwareMap, octoQuad, telemetry)
+        val shooter = Shooter(hardwareMap, odometry, limeLight, telemetry, false)
 
         Scheduler.telemetry = telemetry
-        Scheduler.schedule(octoQuad, odometry, drivetrain, intake)
+        Scheduler.schedule(octoQuad, odometry, drivetrain, intake, transfer, shooter)
 
         val autoTree = behaviorTree("BlueFar Auto") {
             sequence("Main Routine") {
                 add(
-                    BtAction {
-//                        sorter.isOutput = true
-//                        Scheduler.schedule(sorter.moveForward())
-                        succeed()
-                    }
-                )
-                add(
                     shootRoutineFactory(
                         name = "Preload Shoot",
                         drivetrain = drivetrain,
-                        output = output,
-                        sorter = sorter,
-                        kicker = kicker,
+                        shooter = shooter,
+                        transfer = transfer,
                         shootPose = farShootPose,
                         useCloseVelocity = false
                     )
@@ -261,9 +243,8 @@ class BlueFar : LinearOpMode() {
                         name = "Close Cycle",
                         drivetrain = drivetrain,
                         intake = intake,
-                        output = output,
-                        sorter = sorter,
-                        kicker = kicker,
+                        shooter = shooter,
+                        transfer = transfer,
                         queuePose = queueClosePose,
                         grabPose = grabClosePose,
                         shootPose = shootClosePose,
@@ -275,9 +256,8 @@ class BlueFar : LinearOpMode() {
                         name = "Middle Cycle",
                         drivetrain = drivetrain,
                         intake = intake,
-                        output = output,
-                        sorter = sorter,
-                        kicker = kicker,
+                        shooter = shooter,
+                        transfer = transfer,
                         queuePose = queueMiddlePose,
                         grabPose = grabMiddlePose,
                         shootPose = shootClosePose,
@@ -289,9 +269,8 @@ class BlueFar : LinearOpMode() {
                         name = "Far Cycle",
                         drivetrain = drivetrain,
                         intake = intake,
-                        output = output,
-                        sorter = sorter,
-                        kicker = kicker,
+                        shooter = shooter,
+                        transfer = transfer,
                         queuePose = queueFarPose,
                         grabPose = grabFarPose,
                         shootPose = shootClosePose,
@@ -301,7 +280,7 @@ class BlueFar : LinearOpMode() {
                 add(moveToPoseFactory("Park", drivetrain, queueClosePose, speed = 1.0, timeoutMs = 3000))
                 add(
                     BtAction("Shutdown") {
-                        Scheduler.schedule(output.stop())
+                        stopShooter(shooter)
                         Scheduler.schedule(intake.stop())
                         succeed()
                     }
@@ -321,7 +300,7 @@ class BlueFar : LinearOpMode() {
         while (opModeIsActive()) {
             Scheduler.tick()
             telemetry.addData("Auto Node Status", autoTree.treeStatus)
-            telemetry.addData("Transfer Occupied", sorter.occupiedBays)
+            telemetry.addData("Transfer Occupied", transfer.occupiedBays)
             telemetry.update()
         }
 
@@ -334,7 +313,7 @@ class BlueFar : LinearOpMode() {
         drivetrain: Drivetrain,
         intake: Intake,
         shooter: Shooter,
-        sorter: Transfer,
+        transfer: Transfer,
         queuePose: Pose,
         grabPose: Pose,
         shootPose: Pose,
@@ -347,20 +326,19 @@ class BlueFar : LinearOpMode() {
                     name = "$name Pickup",
                     drivetrain = drivetrain,
                     intake = intake,
-                    output = output,
-                    sorter = sorter,
+                    shooter = shooter,
+                    transfer = transfer,
                     queuePose = queuePose,
                     grabPose = grabPose
                 ),
-//                shootRoutineFactory(
-//                    name = "$name Shoot",
-//                    drivetrain = drivetrain,
-//                    output = output,
-//                    sorter = sorter,
-//                    kicker = kicker,
-//                    shootPose = shootPose,
-//                    useCloseVelocity = useCloseVelocity
-//                )
+                shootRoutineFactory(
+                    name = "$name Shoot",
+                    drivetrain = drivetrain,
+                    shooter = shooter,
+                    transfer = transfer,
+                    shootPose = shootPose,
+                    useCloseVelocity = useCloseVelocity
+                )
             )
         )
     }
@@ -369,8 +347,8 @@ class BlueFar : LinearOpMode() {
         name: String,
         drivetrain: Drivetrain,
         intake: Intake,
-        output: Output,
-        sorter: Sorter,
+        shooter: Shooter,
+        transfer: Transfer,
         queuePose: Pose,
         grabPose: Pose
     ): BtCommand<*> {
@@ -379,16 +357,14 @@ class BlueFar : LinearOpMode() {
             listOf(
                 moveToPoseFactory("$name Queue Move", drivetrain, queuePose, speed = 0.5, timeoutMs = 2600),
                 BtAction("$name Intake Setup") {
-                    sorter.isOutput = false
-//                    sorter.move()
-                    Scheduler.schedule(output.stop())
+                    stopShooter(shooter)
                     Scheduler.schedule(intake.intake())
                     succeed()
                 },
                 moveToPoseFactory("$name Grab Move", drivetrain, grabPose, speed = 0.35, timeoutMs = 3200),
                 intakeFillRoutineFactory(
                     name = "$name Fill Transfer",
-                    sorter = sorter,
+                    transfer = transfer,
                     targetOccupiedBays = 3,
                     timeoutMs = 2200
                 ),
@@ -403,89 +379,62 @@ class BlueFar : LinearOpMode() {
     private fun shootRoutineFactory(
         name: String,
         drivetrain: Drivetrain,
-        output: Output,
-        sorter: Sorter,
-        kicker: Kicker,
+        shooter: Shooter,
+        transfer: Transfer,
         shootPose: Pose,
-        useCloseVelocity: Boolean,
-        shots: Int = 3
+        useCloseVelocity: Boolean
     ): BtCommand<*> {
-        val children = mutableListOf<BtCommand<*>>(
-            Parallel("$name Shooter Move", children = listOf(
-                moveToPoseFactory(
-                    "$name Drive",
-                    drivetrain,
-                    shootPose,
-                    speed = 1.0,
-                    timeoutMs = 3200
-                ),
-                BtAction("$name Shooter Setup") {
-                    sorter.isOutput = true
-                    sorter.move()
-                    Scheduler.schedule(output.shoot())
-                    succeed()
-                },
-            ), ParallelPolicy.REQUIRE_ONE),
-            Wait("$name Shooter Settle", 3000.milliseconds),
-            waitForShooterVelocityFactory("$name Velocity Wait", output, tolerance = 60.0, timeoutMs = 1500)
-        )
-
-        if (shots > 1) {
-            children += Repeater(
-                "$name Repeat Shot",
-                singleShotFactory("$name Repeated Shot", kicker, sorter, rotateAfter = true),
-                times = shots - 1,
-                stopOnFailure = false
-            )
-        }
-
-        children += singleShotFactory("$name Final Shot", kicker, sorter, rotateAfter = false)
-        children += BtAction("$name Shooter Stop") {
-            Scheduler.schedule(output.stop())
-            succeed()
-        }
-
-        return Sequence(name, children)
-    }
-
-    private fun singleShotFactory(
-        name: String,
-        kicker: Kicker,
-        sorter: Sorter,
-        rotateAfter: Boolean
-    ): BtCommand<*> {
+        val velocityTolerance = if (useCloseVelocity) 80.0 else 60.0
         return Sequence(
             name,
             listOf(
-                Selector(
-                    "$name Kick Check",
-                    listOf(
-                        Sequence(
-                            "$name Kick If Loaded",
-                            listOf(
-                                Condition("$name Has Ball") {
-                                    // Allow blind firing when tracking is unknown (all bays empty).
-                                    sorter.hasBallAtPosition(Sorter.SlotPosition.Output) || sorter.occupiedBays == 0
-                                },
-                                BtAction("$name Kick") {
-                                    Scheduler.schedule(kicker.kick())
-                                    succeed()
-                                }
-                            )
+                Parallel(
+                    "$name Shooter Move",
+                    children = listOf(
+                        moveToPoseFactory(
+                            "$name Drive",
+                            drivetrain,
+                            shootPose,
+                            speed = 1.0,
+                            timeoutMs = 3200
                         ),
-                        BtAction("$name Skip Kick") { succeed() }
-                    )
+                        BtAction("$name Shooter Setup") {
+                            startShooter(shooter)
+                            succeed()
+                        }
+                    ),
+                    ParallelPolicy.REQUIRE_ONE
                 ),
-                Wait("$name Kick Hold", 400.milliseconds),
-                BtAction("$name Rotate Transfer") {
-                    if (rotateAfter) {
-                        Scheduler.schedule(sorter.moveForward())
-                    }
+                Wait("$name Shooter Settle", 3000.milliseconds),
+                waitForShooterVelocityFactory(
+                    "$name Velocity Wait",
+                    shooter,
+                    tolerance = velocityTolerance,
+                    timeoutMs = 1500
+                ),
+                BtAction("$name Feed Transfer") {
+                    Scheduler.schedule(transfer.shoot())
                     succeed()
                 },
-                Wait("$name Transfer Hold", 1000.milliseconds)
+                Wait("$name Transfer Feed", transfer.shootingTime + 250.milliseconds),
+                BtAction("$name Shooter Stop") {
+                    stopShooter(shooter)
+                    succeed()
+                }
             )
         )
+    }
+
+    private fun startShooter(shooter: Shooter) {
+        if (!shooter.isActive) {
+            Scheduler.schedule(shooter.start())
+        }
+    }
+
+    private fun stopShooter(shooter: Shooter) {
+        if (shooter.isActive) {
+            Scheduler.schedule(shooter.stop())
+        }
     }
 
     private fun moveToPoseFactory(
@@ -520,12 +469,16 @@ class BlueFar : LinearOpMode() {
 
     private fun waitForShooterVelocityFactory(
         name: String,
-        output: Output,
+        shooter: Shooter,
         tolerance: Double,
         timeoutMs: Long
     ): BtCommand<*> {
         return BtAction(name) {
-            val ready = abs(output.currentVel - output.targetVelocity) <= tolerance
+            val targetVelocity = shooter.targetVelocity
+            // A 100000 target means "just give the flywheel time to spin up".
+            val ready = targetVelocity >= 100000.0 ||
+                targetVelocity <= 0.0 ||
+                abs(shooter.currentVelocity - targetVelocity) <= tolerance
             val timedOut = meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds
             if (ready || timedOut) {
                 succeed()
@@ -535,19 +488,12 @@ class BlueFar : LinearOpMode() {
 
     private fun intakeFillRoutineFactory(
         name: String,
-        sorter: Sorter,
+        transfer: Transfer,
         targetOccupiedBays: Int,
         timeoutMs: Long
     ): BtCommand<*> {
-        var hadBallInIntakeLastTick = false
         return BtAction(name) {
-            val hasBallInIntake = sorter.hasBallAtPosition(Sorter.SlotPosition.Intake)
-            if (hasBallInIntake && !hadBallInIntakeLastTick) {
-                Scheduler.schedule(sorter.moveForward())
-            }
-            hadBallInIntakeLastTick = hasBallInIntake
-
-            if (sorter.occupiedBays >= targetOccupiedBays || meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds) {
+            if (transfer.occupiedBays >= targetOccupiedBays || meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds) {
                 succeed()
             }
         }

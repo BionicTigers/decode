@@ -51,6 +51,8 @@ class Transfer(
     }
 
     private val balls = MutableList(3) { BallColor.None }
+    val occupiedBays: Int
+        get() = balls.count { it != BallColor.None }
 
     val shootingTime = 1000.milliseconds
     val intakeAngle = Angle.degrees(65.0)
