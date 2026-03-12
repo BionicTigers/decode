@@ -6,10 +6,22 @@ import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.System
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.utils.getByName
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 
-class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry, val isRed: Boolean): System() {
+class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val isRed: Boolean): System() {
     override val name = "Vision"
+
+    data class AimMeasurement(
+        val txDegrees: Double = 0.0,
+        val valid: Boolean = false,
+        val capturedAt: TimeMark? = null,
+        val sequence: Long = -1L,
+        val isNewSinceLastConsume: Boolean = false
+    )
+
     enum class Obelisk {
         PPG,
         PGP,
@@ -18,18 +30,25 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry, val isRed: B
     }
 
     val ticksToAngle = 0.03937
+    private val measurementPublishInterval = 75.milliseconds
+    private var aimMeasurementSequence = 0L
+    private var consumedAimMeasurementSequence = -1L
+    private var lastPublishedAimMeasurementAt: TimeMark? = null
+    private var storedAimMeasurement = AimMeasurement()
 
-    val offsetBlue = 4.0
-    val offsetRed = 1.1
-
-    var lmlAimError = 0.0
+    val aimMeasurement: AimMeasurement
+        get() = storedAimMeasurement.copy(
+            isNewSinceLastConsume = storedAimMeasurement.valid &&
+                storedAimMeasurement.sequence != consumedAimMeasurementSequence
+        )
 
     val limeLight = hardwareMap.getByName<Limelight3A>("limeLight")
     var obeliskCode = Obelisk.NO_DETECTION
         private set
 
     init {
-        limeLight.setPollRateHz(100)
+        limeLight.setPollRateHz(10)
+        limeLight.pipelineSwitch(0)
         limeLight.start()
     }
 
@@ -50,41 +69,53 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry, val isRed: B
 //        return obeliskCode
 //    }
 
-    fun getAngle(): Double {
-        telemetry.addLine("doing angle")
-        limeLight.pipelineSwitch(0)
-        val result = limeLight.latestResult
-        val fiducials = result.fiducialResults
-        var angleToTurn = 0.0
+    fun getAngle(): Double = aimMeasurement.txDegrees
 
-        fiducials?.forEach {
-            telemetry.addData("ID", it.fiducialId)
-            print(it?.fiducialId)
-            if (it?.fiducialId == 20) { // blue
-                telemetry.addLine("blue")
-                if (!isRed) {
-                    val ty = result.ty
-                    angleToTurn = ty - offsetBlue
+    fun consumeAimMeasurement(): AimMeasurement? {
+        val measurement = aimMeasurement
+        if (!measurement.valid || !measurement.isNewSinceLastConsume) return null
 
-                    telemetry.addData("tx blue", ty)
-                }
-            } else if (it?.fiducialId == 24) { // red
-                telemetry.addLine("red")
-                if (isRed) {
-                    val ty = result.ty
-                    angleToTurn = ty - offsetRed
-                    telemetry.addData("tx red", ty)
-                }
-            }
-        }
-
-        telemetry.addData("ID", fiducials.map { it.fiducialId }.toString())
-
-        return angleToTurn
+        consumedAimMeasurementSequence = measurement.sequence
+        return measurement
     }
 
-    override val apply = SystemCommand.continuous {
-        lmlAimError = getAngle()
+    private fun updateAimMeasurement() {
+        val result = limeLight.latestResult
+        val fiducials = result.fiducialResults.orEmpty()
+        val targetId = if (isRed) 24 else 20
+        val now = TimeSource.Monotonic.markNow()
+        val seesTarget = fiducials.any { it?.fiducialId == targetId }
+        val visibleIds = fiducials.mapNotNull { it?.fiducialId }
+
+        telemetry?.addData("ll targetIds", visibleIds.toString())
+        telemetry?.addData("ll targetVisible", seesTarget)
+
+        if (!seesTarget) {
+            storedAimMeasurement = AimMeasurement()
+            telemetry?.addData("ll tx", "n/a")
+            telemetry?.addData("ll aimError", "n/a")
+            return
+        }
+
+        val canPublish = lastPublishedAimMeasurementAt?.elapsedNow()?.let { it >= measurementPublishInterval } != false
+        val tx = result.tx
+
+        telemetry?.addData("ll tx", tx)
+        telemetry?.addData("ll measurementReady", canPublish)
+
+        if (!canPublish) return
+
+        storedAimMeasurement = AimMeasurement(
+            txDegrees = tx,
+            valid = true,
+            capturedAt = now,
+            sequence = ++aimMeasurementSequence
+        )
+        lastPublishedAimMeasurementAt = now
+    }
+
+    override val apply = SystemCommand.continuous("Limelight Aim") {
+        updateAimMeasurement()
     }
 
 }

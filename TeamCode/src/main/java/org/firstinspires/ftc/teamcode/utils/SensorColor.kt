@@ -7,11 +7,18 @@ data class SensorColor(val red: Double, val green: Double, val blue: Double) {
     companion object {
         val BLACK = SensorColor(0.0, 0.0, 0.0)
 
-        fun fromSensor(sensor: ColorSensor) = SensorColor(
-            sensor.red().toDouble(),
-            sensor.green().toDouble(),
-            sensor.blue().toDouble(),
-        )
+        fun fromSensor(sensor: ColorSensor): SensorColor {
+            val argb = sensor.argb()
+            val a = (argb shr 24) and 0xFF
+            val r = (argb shr 16) and 0xFF
+            val g = (argb shr 8) and 0xFF
+            val b = argb and 0xFF
+            return SensorColor(
+                r.toDouble(),
+                g.toDouble(),
+                b.toDouble(),
+            )
+        }
     }
 
     enum class Channel {

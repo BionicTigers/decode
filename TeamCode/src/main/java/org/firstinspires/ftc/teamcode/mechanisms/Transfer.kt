@@ -30,6 +30,7 @@ import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
+import kotlin.time.measureTime
 
 class Transfer(
     hardwareMap: HardwareMap,
@@ -60,7 +61,7 @@ class Transfer(
         get() = Angle.degrees((octoQuad.encoderData.position[4] / 1024.0 * 360.0))
 
     @Editable
-    private val targetPid = PID(1.25, 0.0, 0.0, 0.0, -30.0, 360.0, -1.0, 1.0)
+    private val targetPid = PID(1.25, 0.0, 0.0, 0.0, -30.0, 360.0, -.65, .65)
 
     @Editable
     var reverseCorrectionWindowDegrees = 90.0
@@ -125,13 +126,20 @@ class Transfer(
         }
 
         timer.update(it).finished {
-            color = SensorColor.fromSensor(colorSensor).normalized()
+                color = SensorColor.fromSensor(colorSensor).normalized()
             val detectedBallColor = getBallColor(color)
-            val isNewColor = detectedBallColor != BallColor.None && detectedBallColor != ballColor
+            val isNewColor =
+                detectedBallColor != BallColor.None && detectedBallColor != ballColor
 
             ballColor = detectedBallColor
 
-            if (isNewColor && abs(getError(targetAngle, currentAngle)) <= ballCaptureErrorDegrees) {
+            if (isNewColor && abs(
+                    getError(
+                        targetAngle,
+                        currentAngle
+                    )
+                ) <= ballCaptureErrorDegrees
+            ) {
                 storeBallInCurrentBay(detectedBallColor)
                 findNextFreeBay()?.let { nextFreeBay ->
                     moveToBay(nextFreeBay, it.lastExecutedAt)
