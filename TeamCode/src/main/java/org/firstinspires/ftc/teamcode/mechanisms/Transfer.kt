@@ -103,7 +103,7 @@ class Transfer(
         motor.direction = DcMotorSimple.Direction.REVERSE
     }
 
-    val timer = Timer(.25.seconds)
+    val timer = Timer(.30.seconds)
     var color = SensorColor(0.0, 0.0, 0.0)
     var ballColor = BallColor.None
     override val update = SystemCommand.continuous("Sorter Telemetry") {
@@ -187,6 +187,13 @@ class Transfer(
         profiledStartedAt = executedAt
     }
 
+    private fun moveToAngleFromBay(angle: Angle, bay: Int, executedAt: TimeMark?) {
+        targetBay = bay
+        targetAngle = getBayAngle(targetBay) + angle
+        motionProfile = motionGenerator.generate(getError(targetAngle, currentAngle), 0.0)
+        profiledStartedAt = executedAt
+    }
+
     private fun clearBalls() {
         for (index in balls.indices) {
             balls[index] = BallColor.None
@@ -224,6 +231,17 @@ class Transfer(
     fun sort() = SystemCommand.instant {
         isShooting = false
         moveToBay((targetBay + 1) % balls.size, it.lastExecutedAt)
+    }
+
+    val angleFromIntakeToPreShoot = Angle.degrees(-15.0)
+    fun shootPrep() = SystemCommand.instant {
+        isShooting = false
+        moveToAngleFromBay(angleFromIntakeToPreShoot, targetBay, it.lastExecutedAt)
+    }
+
+    fun shootSingle() = SystemCommand.instant {
+        isShooting = true
+        shootingAt = it.lastExecutedAt
     }
 
     fun shoot() = SystemCommand.instant {

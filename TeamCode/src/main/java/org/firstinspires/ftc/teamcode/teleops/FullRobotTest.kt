@@ -22,7 +22,7 @@ class FullRobotTest : LinearOpMode() {
         val octoQuad = OctoQuad(hardwareMap, null)
         val transfer = Transfer(hardwareMap, octoQuad, null)
         val intake = Intake(hardwareMap)
-        val limelight = Limelight(hardwareMap, null, false)
+        val limelight = Limelight(hardwareMap, telemetry, false)
         val odometry = Odometry(hardwareMap, telemetry,
             Pose(Distance.inch(14/2).mm, 609.6 * 4 - 609.6 * .5, 90.0)
         )

@@ -47,7 +47,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     val redGoalPos = Pose(3657.6 - 50,0.0, 0.0)
     val blueGoalPos = Pose(3627.6 - 50,3627.6, 0.0)
 
-    val ticksPerRev = 384.5 * 2.825 // https://www.gobilda.com/5203-series-yellow-jacket-planetary-gear-motor-13-7-1-ratio-24mm-length-8mm-rex-shaft-435-rpm-3-3-5v-encoder/
+    val ticksPerRev = 384.5 * 2.825 * 2 // https://www.gobilda.com/5203-series-yellow-jacket-planetary-gear-motor-13-7-1-ratio-24mm-length-8mm-rex-shaft-435-rpm-3-3-5v-encoder/
 
     val flywheel = hardware.getByName<DcMotorEx>("shooter")
     val turret = hardware.getByName<DcMotorEx>("shooterAim")
@@ -58,7 +58,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     private val aimLowerBound = -79.0
     private val aimUpperBound = 105.0
     private val visionMeasurementTimeout = 250.milliseconds
-    private val maxVisionTrimDegrees = 6.0
+    private val maxVisionTrimDegrees = 20.0
     private val visionBlend = 0.65
     private val visionDecay = 0.8
     private val maxVisionSettleErrorDegrees = 12.0
@@ -71,13 +71,22 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
 
     val flywheelVel = RollingAverage(3)
 
+//    val flywheelDistToVel = interpolatedMapOf(
+//        3600.0 to 2300.0,
+//        2200.0 to 2000.0,
+//        1700.0 to 1860.0,
+//        1400.0 to 1740.0,
+//        900.0 to 1540.0,
+//        400.0 to 1680.0
+//    )
+
     val flywheelDistToVel = interpolatedMapOf(
         3600.0 to 2300.0,
-        2200.0 to 2000.0,
-        1700.0 to 1860.0,
-        1400.0 to 1740.0,
-        900.0 to 1540.0,
-        400.0 to 1680.0
+        2200.0 to 1570.0,
+        1700.0 to 1420.0,
+        1400.0 to 1340.0,
+        900.0 to 1140.0,
+        400.0 to 1080.0
     )
 
     val hoodDistToAngle = interpolatedMapOf(
@@ -214,6 +223,7 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
 //            aimLight.position = .4
 
         telemetry?.addData(" -- shooter futurePose --", futurePos)
+        telemetry?.addData(" -- shooter distance to goal --", distanceToGoal)
         telemetry?.addLine("--- aim ---")
         telemetry?.addData("currentAngle", currentAngle)
         telemetry?.addData("visionTrim", visionTrim)
@@ -243,35 +253,31 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         //flywheel
 //        telemetry?.addLine("--- flywheel ---")
 
-        val time = measureTime {
         val currentFlywheelTicks = flywheel.currentPosition
         val flywheelDeltaTicks = currentFlywheelTicks - flywheelTicks
         val flywheelDeltaTime = lastFlywheelSampleAt?.elapsedNow()?.inWholeNanoseconds
         if (flywheelDeltaTime != null && flywheelDeltaTime > 0) {
             flywheelVel += flywheelDeltaTicks * 1_000_000_000.0 / flywheelDeltaTime
         }
-            flywheelTicks = currentFlywheelTicks
-            lastFlywheelSampleAt = TimeSource.Monotonic.markNow()
-        }
-
-        telemetry?.addData("time", time.inWholeMilliseconds)
+        flywheelTicks = currentFlywheelTicks
+        lastFlywheelSampleAt = TimeSource.Monotonic.markNow()
 
         val distToGoalWall = getDistanceToGoalWall(futurePos)
         val desiredVelocity = targetVelocity
         flywheel.ePower =  if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0
         // flywheel.ePower = if (isActive) 1.0 else 0.0
-//        telemetry?.addData("flywheelVel", flywheelVel.average)
-//        telemetry?.addData("-flywlMod",flywlMod)
-//        telemetry?.addData("-targetVelocity", desiredVelocity)
-//        telemetry?.addData("flywheel power", if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0)
+        telemetry?.addData("flywheelVel", flywheelVel.average)
+        telemetry?.addData("-flywlMod",flywlMod)
+        telemetry?.addData("-targetVelocity", desiredVelocity)
+        telemetry?.addData("flywheel power", if (isActive) flywheelPID.compute(flywheelVel.average, desiredVelocity) else 0.0)
 
         // hood
 //        telemetry?.addLine("--- hood ---")
 //
         val hoodAngle = (hoodDistToAngle[distToGoalWall] + hoodMod)
-//        telemetry?.addData("-hoodMod",hoodMod)
-//        telemetry?.addData("-distToGoalWall",distToGoalWall)
-//        telemetry?.addData("-hoodAngle", hoodDistToAngle[distToGoalWall] + hoodMod)
+        telemetry?.addData("-hoodMod",hoodMod)
+        telemetry?.addData("-distToGoalWall",distToGoalWall)
+        telemetry?.addData("-hoodAngle", hoodDistToAngle[distToGoalWall] + hoodMod)
 
         hood.ePosition = hoodAngle
     }
