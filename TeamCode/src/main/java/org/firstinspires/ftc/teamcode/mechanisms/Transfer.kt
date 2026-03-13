@@ -55,13 +55,13 @@ class Transfer(
     val occupiedBays: Int
         get() = balls.count { it != BallColor.None }
 
-    val shootingTime = 1000.milliseconds
+    val shootingTime = 2000.milliseconds
     val intakeAngle = Angle.degrees(65.0)
     private val currentAngle: Angle
         get() = Angle.degrees((octoQuad.encoderData.position[4] / 1024.0 * 360.0))
 
     @Editable
-    private val targetPid = PID(1.25, 0.0, 0.0, 0.0, -30.0, 360.0, -.65, .65)
+    private val targetPid = PID(1.25, 0.0, 0.0, 0.0, -30.0, 360.0, -.45, .45)
 
     @Editable
     var reverseCorrectionWindowDegrees = 90.0
@@ -233,7 +233,7 @@ class Transfer(
         moveToBay((targetBay + 1) % balls.size, it.lastExecutedAt)
     }
 
-    val angleFromIntakeToPreShoot = Angle.degrees(-15.0)
+    val angleFromIntakeToPreShoot = Angle.degrees(-10.0)
     fun shootPrep() = SystemCommand.instant {
         isShooting = false
         moveToAngleFromBay(angleFromIntakeToPreShoot, targetBay, it.lastExecutedAt)

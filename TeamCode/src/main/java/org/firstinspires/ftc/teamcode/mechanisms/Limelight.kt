@@ -31,10 +31,14 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
 
     val ticksToAngle = 0.03937
     private val measurementPublishInterval = 75.milliseconds
+    private val smoothingWindowSize = 5
+    private val maxPublishedTxStepDegrees = 1.5
     private var aimMeasurementSequence = 0L
     private var consumedAimMeasurementSequence = -1L
     private var lastPublishedAimMeasurementAt: TimeMark? = null
     private var storedAimMeasurement = AimMeasurement()
+    private val recentTxSamples = ArrayDeque<Double>()
+    private var filteredTxDegrees: Double? = null
 
     val aimMeasurement: AimMeasurement
         get() = storedAimMeasurement.copy(
@@ -47,7 +51,7 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
         private set
 
     init {
-        limeLight.setPollRateHz(10)
+        limeLight.setPollRateHz(30)
         limeLight.pipelineSwitch(0)
         limeLight.start()
     }
@@ -79,34 +83,66 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
         return measurement
     }
 
+    private fun resetAimFilter() {
+        recentTxSamples.clear()
+        filteredTxDegrees = null
+    }
+
+    private fun smoothTx(rawTxDegrees: Double): Double {
+        recentTxSamples.addLast(rawTxDegrees)
+        if (recentTxSamples.size > smoothingWindowSize) {
+            recentTxSamples.removeFirst()
+        }
+
+        val sortedSamples = recentTxSamples.sorted()
+        val medianTx = sortedSamples[sortedSamples.lastIndex / 2]
+        val previousTx = filteredTxDegrees
+        val nextTx = if (previousTx == null) {
+            medianTx
+        } else {
+            previousTx + (medianTx - previousTx).coerceIn(-maxPublishedTxStepDegrees, maxPublishedTxStepDegrees)
+        }
+
+        filteredTxDegrees = nextTx
+        return nextTx
+    }
+
     private fun updateAimMeasurement() {
         val result = limeLight.latestResult
         val fiducials = result.fiducialResults.orEmpty()
         val targetId = if (isRed) 24 else 20
+        val targetFiducial = fiducials.firstOrNull { it?.fiducialId == targetId }
         val now = TimeSource.Monotonic.markNow()
-        val seesTarget = fiducials.any { it?.fiducialId == targetId }
+        val seesTarget = targetFiducial != null
         val visibleIds = fiducials.mapNotNull { it?.fiducialId }
 
         telemetry?.addData("ll targetIds", visibleIds.toString())
         telemetry?.addData("ll targetVisible", seesTarget)
 
         if (!seesTarget) {
+            resetAimFilter()
             storedAimMeasurement = AimMeasurement()
             telemetry?.addData("ll tx", "n/a")
+            telemetry?.addData("ll rawTx", result.tx)
+            telemetry?.addData("ll filteredTx", "n/a")
             telemetry?.addData("ll aimError", "n/a")
             return
         }
 
         val canPublish = lastPublishedAimMeasurementAt?.elapsedNow()?.let { it >= measurementPublishInterval } != false
-        val tx = result.tx
+        val rawTx = targetFiducial.targetXDegrees
+        val filteredTx = smoothTx(rawTx)
 
-        telemetry?.addData("ll tx", tx)
+        telemetry?.addData("ll tx", filteredTx)
+        telemetry?.addData("ll rawTx", rawTx)
+        telemetry?.addData("ll frameTx", result.tx)
+        telemetry?.addData("ll filteredTx", filteredTx)
         telemetry?.addData("ll measurementReady", canPublish)
 
         if (!canPublish) return
 
         storedAimMeasurement = AimMeasurement(
-            txDegrees = tx,
+            txDegrees = filteredTx,
             valid = true,
             capturedAt = now,
             sequence = ++aimMeasurementSequence
