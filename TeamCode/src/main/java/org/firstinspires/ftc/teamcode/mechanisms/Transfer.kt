@@ -46,9 +46,28 @@ class Transfer(
         None
     }
 
+    enum class SlotPosition {
+        Intake,
+        Middle,
+        Output
+    }
+
+    enum class Motif(
+        val middle: BallColor,
+        val intake: BallColor,
+        val output: BallColor
+    ) {
+        GPP(BallColor.Green, BallColor.Purple, BallColor.Purple),
+        PGP(BallColor.Purple, BallColor.Green, BallColor.Purple),
+        PPG(BallColor.Purple, BallColor.Purple, BallColor.Green)
+    }
+
     interface Schema : ControlSchema {
         val sort: Digital?
         val shoot: Digital?
+        val queueGPP: Digital?
+        val queuePGP: Digital?
+        val queuePPG: Digital?
     }
 
     private val balls = MutableList(3) { BallColor.None }
@@ -120,6 +139,7 @@ class Transfer(
         telemetry?.addData("Intake Color", color)
         telemetry?.addData("Detected Ball Color", ballColor)
         telemetry?.addData("Stored Balls", balls.joinToString())
+        telemetry?.addData("Queued Order", getQueuedOrder())
         if (profiledStartedAt != null && motionProfile != null) {
             telemetry?.addData("Profiled Target Error", motionProfile!!.getPosition(profiledStartedAt!!.elapsedNow()))
             telemetry?.addData("Actual Error", getError(targetAngle, currentAngle))
@@ -169,6 +189,34 @@ class Transfer(
 
     private fun storeBallInCurrentBay(ballColor: BallColor) {
         balls[targetBay] = ballColor
+    }
+
+    private fun getBayForSlot(slot: SlotPosition): Int {
+        return when (slot) {
+            SlotPosition.Intake -> targetBay
+            SlotPosition.Middle -> (targetBay + 2) % balls.size
+            SlotPosition.Output -> (targetBay + 1) % balls.size
+        }
+    }
+
+    fun getBallAt(slot: SlotPosition): BallColor = balls[getBayForSlot(slot)]
+
+    private fun setBallAt(slot: SlotPosition, ballColor: BallColor) {
+        balls[getBayForSlot(slot)] = ballColor
+    }
+
+    fun getQueuedOrder(): String {
+        return listOf(
+            getBallAt(SlotPosition.Middle),
+            getBallAt(SlotPosition.Intake),
+            getBallAt(SlotPosition.Output)
+        ).joinToString(" -> ")
+    }
+
+    private fun applyMotif(motif: Motif) {
+        setBallAt(SlotPosition.Intake, motif.intake)
+        setBallAt(SlotPosition.Middle, motif.middle)
+        setBallAt(SlotPosition.Output, motif.output)
     }
 
     private fun findNextFreeBay(): Int? {
@@ -233,6 +281,16 @@ class Transfer(
         moveToBay((targetBay + 1) % balls.size, it.lastExecutedAt)
     }
 
+    fun queueMotif(motif: Motif) = SystemCommand.instant("Queue ${motif.name}") {
+        applyMotif(motif)
+    }
+
+    fun queueGPP() = queueMotif(Motif.GPP)
+
+    fun queuePGP() = queueMotif(Motif.PGP)
+
+    fun queuePPG() = queueMotif(Motif.PPG)
+
     val angleFromIntakeToPreShoot = Angle.degrees(-10.0)
     fun shootPrep() = SystemCommand.instant {
         isShooting = false
@@ -256,6 +314,9 @@ class Transfer(
 
             sort?.let { builder.register(it) { sort() } }
             shoot?.let { builder.register(it) { shoot() } }
+            queueGPP?.let { builder.register(it) { queueGPP() } }
+            queuePGP?.let { builder.register(it) { queuePGP() } }
+            queuePPG?.let { builder.register(it) { queuePPG() } }
         }
     }
 }

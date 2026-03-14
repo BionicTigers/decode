@@ -28,6 +28,9 @@ open class BaseProfile {
     val sorter = object : Transfer.Schema {
         override val sort = Digital.LEFT_BUMPER
         override val shoot = Digital.RIGHT_BUMPER
+        override val queueGPP = null
+        override val queuePGP = null
+        override val queuePPG = null
         override val desiredGamepad = Gamepads.GAMEPAD_1
     }
 
