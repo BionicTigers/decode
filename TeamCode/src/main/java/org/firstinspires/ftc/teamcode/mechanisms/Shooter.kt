@@ -99,14 +99,14 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
         2200.0 to 1600.0,
         1700.0 to 1480.0,
         1400.0 to 1440.0,
-        1100.0 to 1370.0,
-        900.0 to 1330.0,
+        1100.0 to 1400.0,
+        900.0 to 1380.0,
         400.0 to 1180.0
     )
 
     val hoodDistToAngle = interpolatedMapOf(
-        500.0 to 0.0,
-        800.0 to 0.0,
+        600.0 to 0.0,
+        900.0 to 0.3,
         1400.0 to 1.0,
         1700.0 to 1.0,
         1945.0 to .7,
