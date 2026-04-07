@@ -12,6 +12,7 @@ import io.github.bionictigers.axiom.core.commands.bt.leaves.Wait
 import io.github.bionictigers.axiom.core.commands.bt.traced
 import io.github.bionictigers.axiom.core.scheduler.Scheduler
 import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
+import org.firstinspires.ftc.teamcode.mechanisms.Intake
 import org.firstinspires.ftc.teamcode.mechanisms.Limelight
 import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 import org.firstinspires.ftc.teamcode.mechanisms.Odometry
@@ -20,6 +21,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.Shooter
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer
 import org.firstinspires.ftc.teamcode.utils.Pose
 import kotlin.math.abs
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val TILE = 609.6
@@ -36,6 +38,7 @@ class BlueCloseTree : LinearOpMode() {
         val limelight = Limelight(hardwareMap, telemetry, false)
         val transfer = Transfer(hardwareMap, octoQuad, telemetry)
         val shooter = Shooter(hardwareMap, odometry, limelight, telemetry, false)
+        val intake = Intake(hardwareMap)
 
         Scheduler.telemetry = telemetry
         Scheduler.schedule(octoQuad, odometry, drivetrain, transfer, shooter)
@@ -62,6 +65,15 @@ class BlueCloseTree : LinearOpMode() {
             }
         }.traced()
 
+        Scheduler.schedule(shooter.shooterInit(5000.milliseconds))
+
+        while (opModeInInit()) {
+            Scheduler.tick()
+            if (isStopRequested) {
+                Scheduler.clear()
+            }
+        }
+
         waitForStart()
         if (isStopRequested) {
             Scheduler.clear()
@@ -75,6 +87,7 @@ class BlueCloseTree : LinearOpMode() {
             Scheduler.tick()
             telemetry.addData("Auto Node Status", autoTree.treeStatus)
             telemetry.addData("Transfer Occupied", transfer.occupiedBays)
+            telemetry.addData("code", limelight.obeliskCode)
             telemetry.update()
         }
 
@@ -136,6 +149,47 @@ class BlueCloseTree : LinearOpMode() {
                     stopShooter(shooter)
                     succeed()
                 }
+            )
+        )
+    }
+
+    private fun pickupRoutineFactory(
+        name: String,
+        drivetrain: Drivetrain,
+        transfer: Transfer,
+        pickupStartPose: Pose,
+        intake: Intake,
+        driveSpeed: Double = 1.0,
+        moveTimeoutMs: Long = 3200,
+        settleTimeMs: Long = 3000,
+        velocityTolerance: Double = 80.0,
+        velocityTimeoutMs: Long = 1500
+    ): BtCommand<*> {
+        return Sequence(
+            name,
+            listOf(
+                Parallel(
+                    "$name Move to start",
+                    children = listOf(
+                        moveToPoseFactory(
+                            name = "$name Drive",
+                            drivetrain = drivetrain,
+                            targetPose = pickupStartPose,
+                            speed = driveSpeed,
+                            timeoutMs = moveTimeoutMs
+                        ),
+                        BtAction( "$name Start intake" ) {
+                            Scheduler.schedule(intake.intake())
+                        }
+                    ),
+                ),
+                moveToPoseFactory(
+                    name = "$name Intake move",
+                    drivetrain = drivetrain,
+                    targetPose = pickupStartPose + Pose(0.0,TILE,0.0),
+                    speed = .4,
+                    timeoutMs = moveTimeoutMs
+                ),
             )
         )
     }

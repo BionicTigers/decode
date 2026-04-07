@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap
 import io.github.bionictigers.axiom.core.commands.System
 import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.teamcode.utils.getByName
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -29,7 +30,6 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
         NO_DETECTION
     }
 
-    val ticksToAngle = 0.03937
     private val measurementPublishInterval = 75.milliseconds
     private val smoothingWindowSize = 5
     private val maxPublishedTxStepDegrees = 1.5
@@ -56,22 +56,22 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
         limeLight.start()
     }
 
-//    fun getObeliskCode(): Obelisk {
-//        limeLight.pipelineSwitch(0)
-//        val result = limeLight.latestResult
-//        val fiducials = result.fiducialResults
-//        fiducials?.forEach {
-//            obeliskCode = when (it?.fiducialId) {
-//                21 -> Obelisk.GPP
-//                22 -> Obelisk.PGP
-//                23 -> Obelisk.PPG
-//                else -> Obelisk.NO_DETECTION
-//            }
-//        }
-//        telemetry?.addData("ID", fiducials.map { it.fiducialId }.toString())
-//
-//        return obeliskCode
-//    }
+    fun getObeliskCode(): Obelisk {
+        limeLight.pipelineSwitch(0)
+        val result = limeLight.latestResult
+        val fiducials = result.fiducialResults
+        fiducials?.forEach {
+            obeliskCode = when (it?.fiducialId) {
+                21 -> Obelisk.GPP
+                22 -> Obelisk.PGP
+                23 -> Obelisk.PPG
+                else -> Obelisk.NO_DETECTION
+            }
+        }
+        telemetry?.addData("ID", fiducials.map { it.fiducialId }.toString())
+
+        return obeliskCode
+    }
 
     fun getAngle(): Double = aimMeasurement.txDegrees
 
@@ -152,6 +152,7 @@ class Limelight(hardwareMap: HardwareMap, val telemetry: Telemetry? = null, val 
 
     override val apply = SystemCommand.continuous("Limelight Aim") {
         updateAimMeasurement()
+        getObeliskCode()
     }
 
 }

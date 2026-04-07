@@ -2,6 +2,7 @@
 //
 //import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 //import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+//import io.github.bionictigers.axiom.core.commands.Command
 //import io.github.bionictigers.axiom.core.commands.bt.BtCommand
 //import io.github.bionictigers.axiom.core.commands.bt.behaviorTree
 //import io.github.bionictigers.axiom.core.commands.bt.composites.Parallel
@@ -16,14 +17,15 @@
 //import io.github.bionictigers.axiom.core.scheduler.Scheduler
 //import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain
 //import org.firstinspires.ftc.teamcode.mechanisms.Intake
-//import org.firstinspires.ftc.teamcode.mechanisms.LimeLight
+//import org.firstinspires.ftc.teamcode.mechanisms.Limelight
 //import org.firstinspires.ftc.teamcode.mechanisms.OctoQuad
 //import org.firstinspires.ftc.teamcode.mechanisms.Odometry
-//import org.firstinspires.ftc.teamcode.mechanisms.Output
 //import org.firstinspires.ftc.teamcode.mechanisms.Persistents
-//import org.firstinspires.ftc.teamcode.mechanisms.Sorter
+//import org.firstinspires.ftc.teamcode.mechanisms.Shooter
+//import org.firstinspires.ftc.teamcode.mechanisms.Transfer
 //import org.firstinspires.ftc.teamcode.utils.Distance
 //import org.firstinspires.ftc.teamcode.utils.Pose
+//import org.firstinspires.ftc.teamcode.utils.ePower
 //import kotlin.math.abs
 //import kotlin.time.Duration.Companion.milliseconds
 //
@@ -39,101 +41,45 @@
 //    private val queueFarPose = Pose(989.85, 609.6 * 2, 180)
 //    private val grabFarPose = Pose(384.92, 609.6 * 0.5, 180)
 //
+//
 //    override fun runOpMode() {
 //        val octoQuad = OctoQuad(hardwareMap, telemetry)
 //        val odometry = Odometry(hardwareMap, telemetry, startPose)
 //        val drivetrain = Drivetrain(hardwareMap, telemetry, odometry, octoQuad)
-//        val intake = Intake(hardwareMap, octoQuad)
-//        val kicker = Kicker(hardwareMap, telemetry)
-//        val sorter = Sorter(hardwareMap, kicker, telemetry, octoQuad)
-//        val limeLight = LimeLight(hardwareMap, telemetry )
-//        val output = Output(hardwareMap, kicker, sorter, telemetry, odometry, octoQuad, false, limeLight )
-//
-//        kicker.servo.position = .35
+//        val limelight = Limelight(hardwareMap, telemetry, false)
+//        val transfer = Transfer(hardwareMap, octoQuad, telemetry)
+//        val shooter = Shooter(hardwareMap, odometry, limelight, telemetry, false)
+//        val intake = Intake(hardwareMap)
 //
 //        Scheduler.telemetry = telemetry
-//        Scheduler.schedule(octoQuad, odometry, drivetrain, intake, kicker, sorter, output)
+//        Scheduler.schedule(octoQuad, odometry, drivetrain, transfer, shooter)
 //
-//        val autoTree = behaviorTree("BlueFar Auto") {
+//        val autoTree = behaviorTree("BlueClose Auto") {
 //            sequence("Main Routine") {
-//                add(
-//                    BtAction {
-//                        sorter.isOutput = true
-//                        Scheduler.schedule(sorter.moveForward())
-//                        succeed()
-//                    }
-//                )
 //                add(
 //                    shootRoutineFactory(
 //                        name = "Preload Shoot",
 //                        drivetrain = drivetrain,
-//                        output = output,
-//                        sorter = sorter,
-//                        kicker = kicker,
-//                        shootPose = shootClosePose,
-//                        useCloseVelocity = false
-//                    )
-//                )
-//                add(
-//                    cycleFactory(
-//                        name = "Close Cycle",
-//                        drivetrain = drivetrain,
-//                        intake = intake,
-//                        output = output,
-//                        sorter = sorter,
-//                        kicker = kicker,
-//                        queuePose = queueClosePose,
-//                        grabPose = grabClosePose,
-//                        shootPose = shootClosePose,
-//                        useCloseVelocity = true
-//                    )
-//                )
-//                add(
-//                    cycleFactory(
-//                        name = "Middle Cycle",
-//                        drivetrain = drivetrain,
-//                        intake = intake,
-//                        output = output,
-//                        sorter = sorter,
-//                        kicker = kicker,
-//                        queuePose = queueMiddlePose,
-//                        grabPose = grabMiddlePose,
-//                        shootPose = shootClosePose,
-//                        useCloseVelocity = true
-//                    )
-//                )
-//                add(
-//                    cycleFactory(
-//                        name = "Far Cycle",
-//                        drivetrain = drivetrain,
-//                        intake = intake,
-//                        output = output,
-//                        sorter = sorter,
-//                        kicker = kicker,
-//                        queuePose = queueFarPose,
-//                        grabPose = grabFarPose,
-//                        shootPose = shootClosePose,
-//                        useCloseVelocity = true
-//                    )
-//                )
-//                add(
-//                    moveToPoseFactory(
-//                        "Park",
-//                        drivetrain,
-//                        queueClosePose,
-//                        speed = 1.0,
-//                        timeoutMs = 3000
+//                        shooter = shooter,
+//                        transfer = transfer,
+//                        shootPose = shootPose,
+//                        driveSpeed = 0.8,
+//                        velocityTolerance = 80.0
 //                    )
 //                )
 //                add(
 //                    BtAction("Shutdown") {
-//                        Scheduler.schedule(output.stop())
-//                        Scheduler.schedule(intake.stop())
+//                        stopShooter(shooter)
 //                        succeed()
 //                    }
 //                )
 //            }
 //        }.traced()
+//
+//        while (opModeInInit()) {
+//            Scheduler.schedule()
+//            Scheduler.tick()
+//        }
 //
 //        waitForStart()
 //        if (isStopRequested) {
@@ -147,7 +93,7 @@
 //        while (opModeIsActive()) {
 //            Scheduler.tick()
 //            telemetry.addData("Auto Node Status", autoTree.treeStatus)
-//            telemetry.addData("Transfer Occupied", sorter.occupiedBays)
+//            telemetry.addData("Transfer Occupied", transfer.occupiedBays)
 //            telemetry.update()
 //        }
 //
@@ -155,39 +101,60 @@
 //        Persistents.currentPose = odometry.position
 //    }
 //
-//    private fun cycleFactory(
+//    private fun shootRoutineFactory(
 //        name: String,
 //        drivetrain: Drivetrain,
-//        intake: Intake,
-//        output: Output,
-//        sorter: Sorter,
-//        kicker: Kicker,
-//        queuePose: Pose,
-//        grabPose: Pose,
+//        shooter: Shooter,
+//        transfer: Transfer,
 //        shootPose: Pose,
-//        useCloseVelocity: Boolean
+//        driveSpeed: Double = 1.0,
+//        moveTimeoutMs: Long = 3200,
+//        settleTimeMs: Long = 3000,
+//        velocityTolerance: Double = 80.0,
+//        velocityTimeoutMs: Long = 1500
 //    ): BtCommand<*> {
-//        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
+//        return Sequence(
 //            name,
 //            listOf(
-//                pickupRoutineFactory(
-//                    name = "$name Pickup",
-//                    drivetrain = drivetrain,
-//                    intake = intake,
-//                    output = output,
-//                    sorter = sorter,
-//                    queuePose = queuePose,
-//                    grabPose = grabPose
+//                Parallel(
+//                    "$name Shooter Move",
+//                    children = listOf(
+//                        moveToPoseFactory(
+//                            name = "$name Drive",
+//                            drivetrain = drivetrain,
+//                            targetPose = shootPose,
+//                            speed = driveSpeed,
+//                            timeoutMs = moveTimeoutMs
+//                        ),
+//                        BtAction("$name Shooter Setup") {
+//                            startShooter(shooter)
+//                            succeed()
+//                        }
+//                    ),
+//                    ParallelPolicy.REQUIRE_ONE
 //                ),
-//                shootRoutineFactory(
-//                    name = "$name Shoot",
-//                    drivetrain = drivetrain,
-//                    output = output,
-//                    sorter = sorter,
-//                    kicker = kicker,
-//                    shootPose = shootPose,
-//                    useCloseVelocity = useCloseVelocity
-//                )
+//                Wait("$name Shooter Settle", settleTimeMs.milliseconds),
+//                waitForShooterVelocityFactory(
+//                    name = "$name Velocity Wait",
+//                    shooter = shooter,
+//                    tolerance = velocityTolerance,
+//                    timeoutMs = velocityTimeoutMs
+//                ),
+//                Wait("$name Post-Velocity Wait", 1000.milliseconds),
+//                BtAction("$name Shoot Prep") {
+//                    Scheduler.schedule(transfer.shootPrep())
+//                    succeed()
+//                },
+//                Wait("$name Shoot Prep Wait", 500.milliseconds),
+//                BtAction("$name Feed Transfer") {
+//                    Scheduler.schedule(transfer.shoot())
+//                    succeed()
+//                },
+//                Wait("$name Transfer Feed", transfer.shootingTime + 250.milliseconds),
+//                BtAction("$name Shooter Stop") {
+//                    stopShooter(shooter)
+//                    succeed()
+//                }
 //            )
 //        )
 //    }
@@ -195,143 +162,54 @@
 //    private fun pickupRoutineFactory(
 //        name: String,
 //        drivetrain: Drivetrain,
+//        transfer: Transfer,
+//        pickupStartPose: Pose,
 //        intake: Intake,
-//        output: Output,
-//        sorter: Sorter,
-//        queuePose: Pose,
-//        grabPose: Pose
+//        driveSpeed: Double = 1.0,
+//        moveTimeoutMs: Long = 3200,
+//        settleTimeMs: Long = 3000,
+//        velocityTolerance: Double = 80.0,
+//        velocityTimeoutMs: Long = 1500
 //    ): BtCommand<*> {
-//        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
+//        return Sequence(
 //            name,
 //            listOf(
-//                moveToPoseFactory(
-//                    "$name Queue Move",
-//                    drivetrain,
-//                    queuePose,
-//                    speed = 0.5,
-//                    timeoutMs = 2600
-//                ),
-//                BtAction("$name Intake Setup") {
-//                    sorter.isOutput = false
-////                    sorter.move()
-//                    Scheduler.schedule(output.stop())
-//                    Scheduler.schedule(intake.intake())
-//                    succeed()
-//                },
-//                moveToPoseFactory(
-//                    "$name Grab Move",
-//                    drivetrain,
-//                    grabPose,
-//                    speed = 0.35,
-//                    timeoutMs = 3200
-//                ),
-//                intakeFillRoutineFactory(
-//                    name = "$name Fill Transfer",
-//                    sorter = sorter,
-//                    targetOccupiedBays = 3,
-//                    timeoutMs = 2200
-//                ),
-//                BtAction("$name Intake Stop") {
-//                    Scheduler.schedule(intake.stop())
-//                    succeed()
-//                }
-//            )
-//        )
-//    }
-//
-//    private fun shootRoutineFactory(
-//        name: String,
-//        drivetrain: Drivetrain,
-//        output: Output,
-//        sorter: Sorter,
-//        kicker: Kicker,
-//        shootPose: Pose,
-//        useCloseVelocity: Boolean,
-//        shots: Int = 3
-//    ): BtCommand<*> {
-//        val children = mutableListOf<BtCommand<*>>(
-//            Parallel(
-//                "$name Shooter Move", children = listOf(
-//                    moveToPoseFactory(
-//                        "$name Drive",
-//                        drivetrain,
-//                        shootPose,
-//                        speed = 0.8,
-//                        timeoutMs = 3200
-//                    ),
-//                    BtAction("$name Shooter Setup") {
-//                        sorter.isOutput = true
-//                        sorter.move()
-//                        Scheduler.schedule(output.shoot())
-//                        succeed()
-//                    },
-//                ), ParallelPolicy.REQUIRE_ONE
-//            ),
-//            Wait("$name Shooter Settle", 3000.milliseconds),
-//            waitForShooterVelocityFactory(
-//                "$name Velocity Wait",
-//                output,
-//                tolerance = 60.0,
-//                timeoutMs = 1500
-//            )
-//        )
-//
-//        if (shots > 1) {
-//            children += Repeater(
-//                "$name Repeat Shot",
-//                singleShotFactory("$name Repeated Shot", kicker, sorter, rotateAfter = true),
-//                times = shots - 1,
-//                stopOnFailure = false
-//            )
-//        }
-//
-//        children += singleShotFactory("$name Final Shot", kicker, sorter, rotateAfter = false)
-//        children += BtAction("$name Shooter Stop") {
-//            Scheduler.schedule(output.stop())
-//            succeed()
-//        }
-//
-//        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(name, children)
-//    }
-//
-//    private fun singleShotFactory(
-//        name: String,
-//        kicker: Kicker,
-//        sorter: Sorter,
-//        rotateAfter: Boolean
-//    ): BtCommand<*> {
-//        return io.github.bionictigers.axiom.core.commands.bt.composites.Sequence(
-//            name,
-//            listOf(
-//                Selector(
-//                    "$name Kick Check",
-//                    listOf(
-//                        Sequence(
-//                            "$name Kick If Loaded",
-//                            listOf(
-//                                Condition("$name Has Ball") {
-//                                    // Allow blind firing when tracking is unknown (all bays empty).
-//                                    sorter.hasBallAtPosition(Sorter.SlotPosition.Output) || sorter.occupiedBays == 0
-//                                },
-//                                BtAction("$name Kick") {
-//                                    Scheduler.schedule(kicker.kick())
-//                                    succeed()
-//                                }
-//                            )
+//                Parallel(
+//                    "$name Move to start",
+//                    children = listOf(
+//                        moveToPoseFactory(
+//                            name = "$name Drive",
+//                            drivetrain = drivetrain,
+//                            targetPose = pickupStartPose,
+//                            speed = driveSpeed,
+//                            timeoutMs = moveTimeoutMs
 //                        ),
-//                        BtAction("$name Skip Kick") { succeed() }
-//                    )
+//                        BtAction( "$name Start intake" ) {
+//                            Scheduler.schedule(intake.intake())
+//                        }
+//                    ),
 //                ),
-//                Wait("$name Kick Hold", 400.milliseconds),
-//                BtAction("$name Rotate Transfer") {
-//                    if (rotateAfter) {
-//                        Scheduler.schedule(sorter.moveForward())
-//                    }
-//                    succeed()
-//                },
-//                Wait("$name Transfer Hold", 1000.milliseconds)
+//                moveToPoseFactory(
+//                    name = "$name Intake move",
+//                    drivetrain = drivetrain,
+//                    targetPose = pickupStartPose + Pose(0.0,TILE,0.0),
+//                    speed = .4,
+//                    timeoutMs = moveTimeoutMs
+//                ),
 //            )
 //        )
+//    }
+//
+//    private fun startShooter(shooter: Shooter) {
+//        if (!shooter.isActive) {
+//            Scheduler.schedule(shooter.start())
+//        }
+//    }
+//
+//    private fun stopShooter(shooter: Shooter) {
+//        if (shooter.isActive) {
+//            Scheduler.schedule(shooter.stop())
+//        }
 //    }
 //
 //    private fun moveToPoseFactory(
@@ -346,19 +224,16 @@
 //            if (!started) {
 //                started = true
 //                Scheduler.schedule(drivetrain.moveToPosition(targetPose, speed))
-//                // Skip checking mtp on the first tick — the moveToPosition
-//                // command's enter{} hasn't run yet so mtp is still null.
+//                // Skip checking mtp on the first tick because the scheduled
+//                // move command has not entered yet.
 //                return@BtAction
 //            }
 //
 //            if (drivetrain.mtp == null) {
-//                println("move success")
 //                succeed()
 //            }
 //
 //            if (meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds) {
-//                println("move failed")
-////                drivetrain.mtp = null
 //                succeed()
 //            }
 //        }
@@ -366,34 +241,17 @@
 //
 //    private fun waitForShooterVelocityFactory(
 //        name: String,
-//        output: Output,
+//        shooter: Shooter,
 //        tolerance: Double,
 //        timeoutMs: Long
 //    ): BtCommand<*> {
 //        return BtAction(name) {
-//            val ready = abs(output.currentVel - output.targetVelocity) <= tolerance
+//            val targetVelocity = shooter.targetVelocity
+//            val ready = targetVelocity >= 100000.0 ||
+//                    targetVelocity <= 0.0 ||
+//                    abs(shooter.currentVelocity - targetVelocity) <= tolerance
 //            val timedOut = meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds
 //            if (ready || timedOut) {
-//                succeed()
-//            }
-//        }
-//    }
-//
-//    private fun intakeFillRoutineFactory(
-//        name: String,
-//        sorter: Sorter,
-//        targetOccupiedBays: Int,
-//        timeoutMs: Long
-//    ): BtCommand<*> {
-//        var hadBallInIntakeLastTick = false
-//        return BtAction(name) {
-//            val hasBallInIntake = sorter.hasBallAtPosition(Sorter.SlotPosition.Intake)
-//            if (hasBallInIntake && !hadBallInIntakeLastTick) {
-//                Scheduler.schedule(sorter.moveForward())
-//            }
-//            hadBallInIntakeLastTick = hasBallInIntake
-//
-//            if (sorter.occupiedBays >= targetOccupiedBays || meta.enteredAt.elapsedNow() >= timeoutMs.milliseconds) {
 //                succeed()
 //            }
 //        }

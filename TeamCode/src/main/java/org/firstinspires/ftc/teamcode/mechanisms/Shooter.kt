@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.mechanisms
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.Servo
+import io.github.bionictigers.axiom.core.commands.Command
 import io.github.bionictigers.axiom.core.commands.System
 import io.github.bionictigers.axiom.core.input.ControlSchema
 import io.github.bionictigers.axiom.core.input.Controllable
@@ -26,6 +27,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.withSign
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -95,11 +97,11 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
 //    )
 
     val flywheelDistToVel = interpolatedMapOf(
-        3600.0 to 2300.0,
-        2200.0 to 1600.0,
-        1700.0 to 1480.0,
-        1400.0 to 1440.0,
-        1100.0 to 1400.0,
+        3600.0 to 2100.0,
+        2200.0 to 1800.0,
+        1700.0 to 1600.0,
+        1400.0 to 1400.0,
+        1100.0 to 1300.0,
         900.0 to 1380.0,
         400.0 to 1180.0
     )
@@ -107,10 +109,10 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     val hoodDistToAngle = interpolatedMapOf(
         600.0 to 0.0,
         900.0 to 0.3,
-        1400.0 to 1.0,
-        1700.0 to 1.0,
-        1945.0 to .7,
-        3000.0 to 0.8
+        1400.0 to 0.8,
+        1700.0 to 0.8,
+        1945.0 to .5,
+        3000.0 to 0.7
     )
 
     var flywlMod = 0.0
@@ -143,8 +145,24 @@ class Shooter(hardware: HardwareMap, val odometry: Odometry?, val limeLight: Lim
     var aimedAt: TimeMark? = null
     var lastFlywheelSampleAt: TimeMark? = null
 
+    var initTarget = if (!isRed) -100.0 else 100.0
+
     init {
         junkTicks = turret.currentPosition
+    }
+
+    var initStartTime = TimeSource.Monotonic.markNow()
+
+    fun shooterInit(timeout: Duration) = Command.create {
+        enter {
+            initStartTime = TimeSource.Monotonic.markNow()
+        }
+        action {
+            turret.ePower = turretPID.compute(currentAngle, initTarget)
+            if (currentAngle == initTarget || initStartTime.elapsedNow() >= timeout) {
+                stop()
+            }
+        }
     }
 
     private fun getFuturePose(): Pose? = odometry?.let { it.position + (it.velocity * .02) }
